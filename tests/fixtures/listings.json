@@ -1,0 +1,50 @@
+[
+  {
+    "item_id": "B0TESTRUG1",
+    "domain_name": "amazon.de",
+    "marketplace": "Amazon",
+    "country": "DE",
+    "product_type": [{"value": "RUG"}],
+    "item_name": [
+      {"language_tag": "de_DE", "value": "Teppich Kurzflor, Blau, 120 x 170 cm"},
+      {"language_tag": "en_US", "value": "Short Pile Rug, Blue, 120 x 170 cm"}
+    ],
+    "brand": [{"language_tag": "de_DE", "value": "Rivet"}],
+    "color": [
+      {"language_tag": "de_DE", "value": "Blau"},
+      {"language_tag": "en_US", "value": "Blue"}
+    ],
+    "fabric_type": [{"language_tag": "en_US", "value": "100% Polypropylene"}],
+    "bullet_point": [
+      {"language_tag": "en_US", "value": "Soft short pile"},
+      {"language_tag": "de_DE", "value": "Weicher Kurzflor"},
+      {"language_tag": "en_US", "value": "Easy to clean"}
+    ],
+    "item_weight": [{"normalized_value": {"unit": "pounds", "value": 2.0}, "unit": "pounds", "value": 2.0}],
+    "main_image_id": "81testA",
+    "other_image_id": ["91testB", "91testC"],
+    "node": [{"node_id": 1, "node_name": "/Home/Rugs"}],
+    "model_number": [{"value": "R-100"}]
+  },
+  {
+    "item_id": "B0TESTSHOE",
+    "domain_name": "amazon.fr",
+    "marketplace": "Amazon",
+    "country": "FR",
+    "product_type": [{"value": "SHOES"}],
+    "item_name": [{"language_tag": "fr_FR", "value": "Chaussures en cuir, noir"}],
+    "brand": [{"language_tag": "fr_FR", "value": "find."}],
+    "color": [{"language_tag": "fr_FR", "value": "Noir"}],
+    "main_image_id": "71testD"
+  },
+  {
+    "item_id": "B0TESTFOOD",
+    "domain_name": "wholefoodsmarket.com",
+    "marketplace": "WholeFoods",
+    "country": "US",
+    "product_type": [{"value": "GROCERY"}],
+    "item_name": [{"language_tag": "en_US", "value": "365 Everyday Value Organic Cashews, 10 OZ"}],
+    "brand": [{"language_tag": "en_US", "value": "365 Everyday Value"}],
+    "item_weight": [{"normalized_value": {"unit": "stone", "value": 1}, "unit": "stone", "value": 1}]
+  }
+]
