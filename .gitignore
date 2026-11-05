@@ -1,0 +1,21 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+.ruff_cache/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Local settings and secrets
+.env
+
+# Downloaded data (large, and easy to download again).
+# The leading slash means "only the data folder at the top", not src/listingaudit/data.
+/data/
+
+# OS / editor
+.DS_Store
+.vscode/
+.idea/
