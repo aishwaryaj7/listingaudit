@@ -8,7 +8,8 @@ photos for and, later, which rules the agent should check.
 RULE_GROUPS: dict[str, list[str]] = {
     # Textile Regulation: fibre composition must be shown
     "textile": ["RUG", "PILLOW", "FLAT_SHEET", "HOME_BED_AND_BATH", "CURTAIN"],
-    # Energy labelling: lamps and light sources must show their energy label
+    # Energy labelling: light bulbs sold on their own must show their energy label.
+    # Lamps have had no label of their own since 2021; we keep them to test that.
     "energy_label": [
         "LAMP",
         "LIGHT_BULB",
