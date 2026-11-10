@@ -5,9 +5,12 @@ description = "An AI agent that audits online shop listings against EU consumer 
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
+    "faker>=40",
     "httpx>=0.27",
+    "numpy>=2.0",
     "pandas>=2.2",
     "psycopg[binary]>=3.2",
+    "pydantic>=2.8",
     "pydantic-settings>=2.4",
     "sqlalchemy>=2.0",
     "tqdm>=4.66",

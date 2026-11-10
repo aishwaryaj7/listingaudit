@@ -15,6 +15,9 @@ class Settings(BaseSettings):
     postgres_db: str = "listingaudit"
     postgres_host: str = "localhost"
     postgres_port: int = 5432
+    # The agent's own login: it can read the marketplace but not the answer key
+    agent_db_user: str = "listingaudit_agent"
+    agent_db_password: str = "listingaudit_agent"
 
     data_dir: Path = PROJECT_ROOT / "data"
     abo_base_url: str = "https://amazon-berkeley-objects.s3.amazonaws.com"
@@ -23,6 +26,13 @@ class Settings(BaseSettings):
     def database_url(self) -> str:
         return (
             f"postgresql://{self.postgres_user}:{self.postgres_password}"
+            f"@{self.postgres_host}:{self.postgres_port}/{self.postgres_db}"
+        )
+
+    @property
+    def agent_database_url(self) -> str:
+        return (
+            f"postgresql://{self.agent_db_user}:{self.agent_db_password}"
             f"@{self.postgres_host}:{self.postgres_port}/{self.postgres_db}"
         )
 
