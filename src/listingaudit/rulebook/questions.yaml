@@ -1,0 +1,68 @@
+# Test questions for the rulebook search, with the articles that answer them.
+#
+# Phrased in everyday words, the way a seller or reviewer would ask, and written
+# before looking at any search results. A question counts as found when one of
+# its articles comes back. Ids are "<law>/<article>", as in the chunk ids.
+
+- question: A shop shows a crossed-out "was" price next to the sale price. Which earlier price may it show?
+  answers: [pid/6a, pangv/11]
+- question: How many days back do I look to find the lowest price before a discount?
+  answers: [pid/6a, pangv/11]
+- question: Can a seller put the price up for a week and then advertise a big discount?
+  answers: [pid/6a, pangv/11, pid_guidance, aldi_sued]
+- question: Must a "-30%" badge be worked out from the lowest price of the last 30 days?
+  answers: [aldi_sued, pid/6a, pangv/11]
+- question: Does the 30-day rule apply when I compare my price with the manufacturer's recommended retail price?
+  answers: [pid_guidance]
+- question: Do I need to show the earlier price for food reduced because it will soon go off?
+  answers: [pid/6a, pangv/11]
+- question: The discount grows step by step during a sale. Which earlier price do I show?
+  answers: [pid/6a, pangv/11]
+- question: Do I have to show the price per kilogram for coffee sold in 500 g bags?
+  answers: [pangv/4, pid/3]
+- question: Which quantity should the unit price use, a kilogram or 100 grams?
+  answers: [pangv/5]
+- question: Can I leave out the price per litre when the bottle holds exactly one litre?
+  answers: [pangv/4]
+- question: Does a gift box with a shampoo and a body lotion need a unit price?
+  answers: [pangv/4]
+- question: What is a unit price?
+  answers: [pid/2, pangv/2]
+- question: What information about the manufacturer must an online listing show?
+  answers: [gpsr/19]
+- question: The manufacturer is in China. Who else must be named in the listing?
+  answers: [gpsr/19, gpsr/16]
+- question: Do online offers have to show the product's safety warnings?
+  answers: [gpsr/19]
+- question: Does the product safety regulation apply to food?
+  answers: [gpsr/2]
+- question: Must a product listing include a picture of the product?
+  answers: [gpsr/19]
+- question: What must an online marketplace do when someone reports a dangerous product?
+  answers: [gpsr/22]
+- question: Which company has to be based in the EU before a product can be sold there?
+  answers: [gpsr/16]
+- question: Must the fabric content be visible before someone buys online?
+  answers: [textile/16]
+- question: How do I label a fabric made of several different fibres?
+  answers: [textile/9]
+- question: Can a seller write "rayon" instead of the official EU fibre name?
+  answers: [textile/5, textile/annex_i]
+- question: When may a textile be labelled "100%" or "pure"?
+  answers: [textile/7]
+- question: Where must an online shop show the energy label of a light bulb?
+  answers: [light_sources/annex_viii, light_sources/4, energy_label/5]
+- question: What must a dealer do with the energy label when selling online?
+  answers: [energy_label/5, light_sources/4, light_sources/annex_viii]
+- question: Is a product photo in a different colour from the description misleading?
+  answers: [ucpd/6]
+- question: When is leaving out information a misleading omission?
+  answers: [ucpd/7]
+- question: Can a seller call a product "climate neutral" because of carbon offsets?
+  answers: [ucpd/annex_i]
+- question: Wie viele Tage vor einer Preisermäßigung zählen für den niedrigsten Preis?
+  answers: [pangv/11, pid/6a]
+- question: Muss bei Lebensmitteln in Fertigpackungen der Grundpreis angegeben werden?
+  answers: [pangv/4]
+- question: Welche Angaben zum Hersteller muss ein Online-Angebot enthalten?
+  answers: [gpsr/19]
