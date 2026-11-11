@@ -1,12 +1,10 @@
 """Prices and 90-day price histories.
 
-Money is always a whole number of cents, never a float. Floats can't store most
-decimal amounts exactly (0.1 + 0.2 is 0.30000000000000004), and a price checker
-has to be right to the cent.
+Money is kept as integer cents, never floats, so price checks are exact.
 
-Each function below tells one "price story": how the price moved over the last
+Each story function returns a PriceStory: how the price moved over the last
 90 days and what the listing shows today. Some stories follow the 30-day rule,
-some break it on purpose.
+others break it on purpose.
 """
 
 from dataclasses import dataclass
@@ -78,7 +76,7 @@ def base_price(product_type: str, rng: np.random.Generator, pack_total: float | 
 
 
 def lower_price(price: int, rate: float) -> int:
-    """`price` reduced by about `rate` (0.2 = 20%), as a shop price that is really lower."""
+    """`price` reduced by about `rate` (0.2 = 20%), as a shop price strictly below it."""
     lowered = charm(price / 100 * (1 - rate))
     while lowered >= price:
         lowered -= 50

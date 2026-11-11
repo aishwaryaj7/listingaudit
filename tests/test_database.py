@@ -1,7 +1,7 @@
-"""The saved marketplace, and what the agent's own login may and may not do.
+"""The built marketplace and the permissions of the agent's role.
 
-These need the database and a finished build (uv run python -m listingaudit.market.build).
-They are skipped when either is missing.
+Needs a running database and a finished build (python -m listingaudit.market.build);
+skipped otherwise.
 """
 
 import psycopg

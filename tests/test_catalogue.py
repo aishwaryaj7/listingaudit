@@ -37,7 +37,7 @@ def test_pack_sizes_are_read_from_the_title(title, pack):
         "Tea Pods, 24 Ct.",  # a count, no size
         "Sparkling Water, 12 Fl Oz, 12 Count",  # is the size per can or for all of them?
         "Peanut Butter, 16 oz and 32 oz",  # two different sizes
-        "Laundry Detergent, 2-1 Gal",  # not a size we can read
+        "Laundry Detergent, 2-1 Gal",  # not a readable size
         "Throw Pillow Cover",  # no size at all
     ],
 )
@@ -76,7 +76,7 @@ def test_colour_families(color, family):
             "cover: 63% linen, 37% viscose; insert: 100% cotton",
         ),
         ("50% cotton, 40% polyester", None),  # doesn't add up to 100%
-        ("100% Cotton Duck", None),  # words we don't understand
+        ("100% Cotton Duck", None),  # unknown words
         ("Cotton", None),  # no percentages
         (None, None),
     ],
@@ -113,7 +113,7 @@ def test_sets_of_different_products(title, mixed):
         ("CANDLE", "Scented Candle, 8 oz", "candle"),
         ("CANDLE", "Glass Candle Holder", None),  # not a candle
         ("SOFA", "Two-Seater Sofa", "general"),
-        ("CELLULAR_PHONE_CASE", "Phone Case", None),  # no rule of ours needs it
+        ("CELLULAR_PHONE_CASE", "Phone Case", None),  # not a focus product type
     ],
 )
 def test_products_are_sorted_into_kinds(product_type, text, kind):
@@ -145,8 +145,8 @@ def test_make_product_reads_the_facts():
 
 
 def test_textile_with_unreadable_composition_is_left_out():
-    # It states a composition, but not one we can read: a wrong guess would put
-    # a rule break into the data that the answer key doesn't know about
+    # States a composition that can't be parsed. A wrong guess would put a rule
+    # break into the data that the answer key doesn't know about.
     assert make_product(row(fabric_type="60% Cotton Blend, 40% Other")) is None
 
 

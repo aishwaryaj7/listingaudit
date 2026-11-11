@@ -2,8 +2,8 @@
 
     uv run python -m listingaudit.data.download_abo
 
-About 96 MB in total. Files that are already complete are skipped, so it is
-safe to run again after a broken connection.
+About 96 MB. Complete files are skipped, so it can be rerun after a failed
+download.
 """
 
 from pathlib import Path
@@ -24,8 +24,7 @@ def download(client: httpx.Client, url: str, target: Path) -> None:
     if target.exists() and target.stat().st_size == expected_size:
         return
 
-    # Write to a temporary name first, so a half-finished download never
-    # looks like a complete file.
+    # Write to a .part file first so an interrupted download never looks complete
     partial = target.with_suffix(target.suffix + ".part")
     with client.stream("GET", url) as response:
         response.raise_for_status()

@@ -1,13 +1,11 @@
-"""Download product photos for a sample of the listings.
+"""Download main photos for a sample of the focus product types.
 
     uv run python -m listingaudit.data.download_images --per-type 100
 
-All 398k ABO photos would be many gigabytes, so we only fetch the main photo
-of up to N products per product type in categories.FOCUS_PRODUCT_TYPES. The
-sample is random but repeatable: the same seed always picks the same products.
-
-We only pick products whose main photo belongs to them alone. Shared photos
-are often logos or placeholders, and would confuse the photo checks later.
+Takes up to N products per type in categories.FOCUS_PRODUCT_TYPES, since the
+full set of 398k ABO photos is many gigabytes. The sample is deterministic for
+a given seed. Products whose main photo is shared with other products are
+skipped, as shared photos are mostly logos and placeholders.
 """
 
 import argparse

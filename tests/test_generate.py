@@ -1,7 +1,7 @@
 """Whole splits: the same seed gives the same data, and the answer key is complete.
 
 These run on a made-up catalogue, and also on the real ABO products when the
-database from step 1 is running.
+database is available.
 """
 
 from collections import Counter, defaultdict
@@ -33,7 +33,7 @@ def catalogue(request):
         with connect() as conn:
             products, photos = load_catalogue(conn)
     except psycopg.Error:
-        pytest.skip("the database from step 1 is not running")
+        pytest.skip("the database is not running")
     if not products:
         pytest.skip("no ABO products in the database")
     return products, photos
@@ -135,9 +135,9 @@ def cents(amount: Decimal) -> int:
 def broken_rules(offer: Offer, product: Product, history: list[Decimal]) -> set[Rule]:
     """Check a listing against every rule, using only what the listing shows.
 
-    This is written separately from the generator on purpose: it reads the price
-    history, the price box and the safety information the way a careful human
-    checker would, without knowing how the listing was made.
+    Deliberately independent of the generator: it reads the price history, the
+    price box and the safety information the way a careful human checker would,
+    without knowing how the listing was made.
     """
     broken = set()
     prices = [cents(price) for price in history]
@@ -187,9 +187,12 @@ def broken_rules(offer: Offer, product: Product, history: list[Decimal]) -> set[
 
 
 def test_listings_break_exactly_the_planted_rules(splits, products):
-    """The most important test. A rule break the answer key doesn't know about
-    would mark the agent wrong for finding it; a planted problem the listing
-    doesn't really show would ask the agent to find something that isn't there."""
+    """The answer key must match the listings exactly.
+
+    A rule break the answer key doesn't know about would mark the agent wrong for
+    finding it; a planted problem the listing doesn't really show would ask the
+    agent to find something that isn't there.
+    """
     for result in splits.values():
         histories = defaultdict(list)
         for point in result.prices:

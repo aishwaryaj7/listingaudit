@@ -1,9 +1,8 @@
-"""The shapes of the data we generate, checked by Pydantic.
+"""Pydantic models for the generated data.
 
-These models check that data is well formed, not that it follows the rules. A
-listing with a fake discount is fine here (we plant those on purpose); a 'was'
-price below the current price, or a discount of 140%, is a bug in the generator
-and stops the build.
+They check that the data is well formed, not that it follows the rules. A fake
+discount is fine here (those are planted on purpose); a 'was' price below the
+current price, or a discount of 140%, is a generator bug and stops the build.
 """
 
 from datetime import date
@@ -43,16 +42,15 @@ TrapType = Literal[
 
 
 def money(cents: int | None) -> Decimal | None:
-    """Whole cents -> an exact Decimal in euros, always with 2 decimals.
+    """Whole cents -> Decimal euros with exactly 2 places.
 
-    3999 -> Decimal('39.99'), 70 -> Decimal('0.70'). (Dividing by 100 would give
-    Decimal('0.7'), which is the same amount but doesn't look like a price.)
+    3999 -> Decimal('39.99'), 70 -> Decimal('0.70') (dividing by 100 would give 0.7).
     """
     return None if cents is None else Decimal(cents).scaleb(-2)
 
 
 class Offer(BaseModel):
-    """One listing on the pretend marketplace: everything the agent may see."""
+    """One marketplace listing: everything the agent may see."""
 
     offer_id: str = Field(pattern=r"^[PE]\d{4}$")
     split: Split

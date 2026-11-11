@@ -4,8 +4,8 @@ Faker writes names and addresses in each country's local format. Emails and
 websites use the reserved ".example" domain, so no generated address can belong
 to a real company.
 
-For China and Turkey, Faker has no English-language addresses, so we use small
-templates instead.
+Faker has no English-language addresses for China and Turkey, so those come
+from small templates instead.
 """
 
 import re
@@ -15,7 +15,7 @@ from dataclasses import dataclass
 import numpy as np
 from faker import Faker
 
-# EU member states we generate companies in: ISO code -> (English name, Faker locale)
+# EU member states for generated companies: ISO code -> (English name, Faker locale)
 EU = {
     "DE": ("Germany", "de_DE"),
     "AT": ("Austria", "de_AT"),

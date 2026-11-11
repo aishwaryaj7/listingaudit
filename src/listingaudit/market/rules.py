@@ -1,9 +1,7 @@
-"""The rules of the pretend marketplace, in one place.
+"""Simplified EU and German listing rules, as used by the generator.
 
-Simplified versions of the EU and German rules in the project plan. The generator
-uses them to build listings that follow the rules, and the answer key stores
-which rules apply to each listing, so we can later check that the agent picked
-the right ones. Step 3 turns these into a proper rulebook with the law texts.
+The generator builds listings that follow these rules, and the answer key
+records which rules apply to each listing so the agent's choice can be graded.
 """
 
 from enum import StrEnum
@@ -22,7 +20,7 @@ class Rule(StrEnum):
     PHOTO_MATCHES_TEXT = "photo_matches_text"
 
 
-# What each rule says, in plain words, and where it comes from
+# Plain-language summary and legal source of each rule
 RULES: dict[Rule, tuple[str, str]] = {
     Rule.PRIOR_PRICE: (
         "A listing that announces a price reduction shows, as the 'was' price, the lowest "

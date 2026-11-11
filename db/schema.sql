@@ -1,4 +1,4 @@
--- Tables for step 1: the raw product catalogue from Amazon Berkeley Objects (ABO).
+-- Raw product catalogue from Amazon Berkeley Objects (ABO).
 -- Every statement uses IF NOT EXISTS, so running this file twice is harmless.
 
 -- One row per photo in the ABO catalogue (from images.csv.gz)
@@ -6,10 +6,10 @@ CREATE TABLE IF NOT EXISTS images (
     image_id    TEXT PRIMARY KEY,
     height      INTEGER NOT NULL,
     width       INTEGER NOT NULL,
-    path           TEXT NOT NULL,   -- where the photo lives on the ABO server
-    used_by_items  INTEGER,         -- how many different products use it as main photo
-    used_by_types  INTEGER,         -- ... and across how many product types
-    local_file     TEXT             -- filled in once we have downloaded it
+    path           TEXT NOT NULL,   -- path on the ABO image server
+    used_by_items  INTEGER,         -- distinct products using it as main photo
+    used_by_types  INTEGER,         -- distinct product types among them
+    local_file     TEXT             -- set by download_images
 );
 
 -- One row per product listing. The same product (item_id) can be listed on
@@ -21,7 +21,7 @@ CREATE TABLE IF NOT EXISTS listings (
     marketplace      TEXT,
     country          TEXT,
     product_type     TEXT,
-    text_language    TEXT,          -- which language the text columns below are in
+    text_language    TEXT,          -- language of all text columns below
     item_name        TEXT,
     brand            TEXT,
     color            TEXT,
@@ -33,7 +33,7 @@ CREATE TABLE IF NOT EXISTS listings (
     main_image_id    TEXT REFERENCES images (image_id),
     other_image_ids  TEXT[],
     category_path    TEXT,
-    raw              JSONB NOT NULL,  -- the original record, so nothing is lost
+    raw              JSONB NOT NULL,  -- original ABO record
     UNIQUE (item_id, domain_name)
 );
 

@@ -2,7 +2,7 @@
 
     uv run python -m listingaudit.data.load_abo
 
-Running it again replaces the old data with a fresh copy.
+Re-running drops and reloads both tables.
 """
 
 import csv
@@ -73,9 +73,9 @@ def load_listings(cur) -> int:
     return count
 
 
-# Some photos are shared by many products: brand logos, "image coming soon"
-# placeholders, or one photo reused for every size and colour of a product.
-# Counting how many products use each photo lets us skip those later.
+# Some photos are shared by many products (brand logos, "image coming soon"
+# placeholders, one photo for every size and colour). download_images uses
+# these counts to skip them.
 COUNT_PHOTO_USE = """
 UPDATE images i
 SET used_by_items = s.items, used_by_types = s.types
@@ -94,8 +94,8 @@ WHERE i.image_id = s.main_image_id
 def main() -> None:
     # One transaction: if anything fails, the database keeps its old data.
     with connect() as conn, conn.cursor() as cur:
-        # Everything in these tables can be rebuilt from the downloaded files,
-        # so we simply recreate them. That also picks up any schema changes.
+        # Both tables are derived from the downloaded files, so recreate them
+        # (this also picks up schema changes)
         cur.execute("DROP TABLE IF EXISTS listings, images")
         apply_schema(conn)
         n_images = load_images(cur)

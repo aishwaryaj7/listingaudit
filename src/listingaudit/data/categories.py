@@ -1,15 +1,14 @@
-"""Which ABO product types matter for which rule.
+"""ABO product types grouped by the rule that applies to them.
 
-We don't need all 147k listings. Phone cases alone are 44% of ABO, and none of
-our special rules apply to them. These groups decide which products we keep
-photos for and, later, which rules the agent should check.
+Only these types are sampled. Most of ABO falls under none of the
+product-specific rules (phone cases alone are 44% of the listings).
 """
 
 RULE_GROUPS: dict[str, list[str]] = {
     # Textile Regulation: fibre composition must be shown
     "textile": ["RUG", "PILLOW", "FLAT_SHEET", "HOME_BED_AND_BATH", "CURTAIN"],
     # Energy labelling: light bulbs sold on their own must show their energy label.
-    # Lamps have had no label of their own since 2021; we keep them to test that.
+    # Lamps have had no label of their own since 2021 (kept as negative cases).
     "energy_label": [
         "LAMP",
         "LIGHT_BULB",
@@ -30,7 +29,7 @@ RULE_GROUPS: dict[str, list[str]] = {
     ],
     # Products that usually need safety warnings
     "warnings": ["CANDLE"],
-    # Everything else still needs the general product safety info (GPSR)
+    # Only the general product safety info (GPSR) applies
     "general": ["CHAIR", "SOFA", "TABLE", "HOME_FURNITURE_AND_DECOR", "SHOES"],
 }
 

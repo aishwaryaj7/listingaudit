@@ -1,9 +1,8 @@
 """Decide which listings get which problems and traps.
 
-Like a teacher hiding mistakes in homework, we decide up front how many of each
-mistake to hide, then hand them out to products where they make sense: a missing
-fibre composition only makes sense on a textile, a missing energy label only on
-a light bulb.
+The number of listings per problem is fixed up front. Problems are then handed
+out to products they fit: a missing fibre composition only fits a textile, a
+missing energy label only a light bulb.
 """
 
 from collections import Counter
@@ -73,7 +72,7 @@ class Plan:
 
 
 def natural_trap(product: Product) -> str | None:
-    """Products that look like they break a rule but don't, whatever we do with them."""
+    """The trap a product is by nature: it looks like it breaks a rule but doesn't."""
     if product.kind == "mixed_set":
         return "mixed_set"
     if product.kind == "not_textile":
@@ -122,9 +121,9 @@ def reserve_photo(
 ) -> tuple[Photo, bool]:
     """Set aside a photo of another product of the same type, in another colour.
 
-    A colour that is easy to confuse (beige for white) makes a hard case, so we
-    look for one when `want_near` is set. The photo is taken out of `photos`, so
-    no other listing gets it and `fits` only sees the photos that are still free.
+    A colour that is easy to confuse (beige for white) makes a hard case and is
+    preferred when `want_near` is set. The photo is removed from `photos`, so no
+    other listing gets it and `fits` only sees the photos that are still free.
     Returns the photo and whether its colour is a near one.
     """
     options = [
@@ -158,8 +157,8 @@ def _add_wide_problem(plan: Plan, product, photos, counts: Counter, rng) -> bool
     plan.problems.append(choice)
     counts[choice] += 1
     if choice == "photo_mismatch":
-        # Hard means the colours are easy to confuse. We ask for that whenever the
-        # hard swaps are not ahead, so easy and hard stay even where photos allow.
+        # Hard means the colours are easy to confuse. Ask for one whenever hard
+        # swaps aren't ahead, so easy and hard stay even where photos allow.
         want_near = counts["photo_hard"] <= counts["photo_easy"]
         plan.photo, near = reserve_photo(product, photos, want_near, rng)
         plan.hard[choice] = near
@@ -170,7 +169,7 @@ def _add_wide_problem(plan: Plan, product, photos, counts: Counter, rng) -> bool
 def plan_split(
     products: list[Product], photos: dict[str, list[Photo]], rng: np.random.Generator
 ) -> list[Plan]:
-    """`photos` are the photos we may swap in, by product type. It is not changed."""
+    """`photos` holds the swappable photos by product type; it is not modified."""
     photos = {product_type: list(options) for product_type, options in photos.items()}
     plans = [Plan(trap=natural_trap(p)) for p in products]
     order = [int(i) for i in rng.permutation(len(products))]

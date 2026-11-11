@@ -1,8 +1,7 @@
-"""Build one listing: first with everything right, then break rules on purpose.
+"""Build one listing: first fully compliant, then with its planned problems.
 
-Starting from a correct listing and changing only what a problem needs keeps
-every listing honest about one thing: whatever is wrong with it is in the answer
-key, and nothing else is.
+Starting from a correct listing and changing only what each problem needs means
+everything wrong with a listing is in the answer key, and nothing else is.
 """
 
 import re
@@ -124,12 +123,12 @@ HARD_NOTES = [
 class Context:
     rng: np.random.Generator
     directory: Directory
-    snapshot: date  # "today" on the pretend marketplace
+    snapshot: date  # "today" for the marketplace
 
 
 @dataclass
 class Listing:
-    """A listing while we build it, plus what the answer key needs to know."""
+    """A listing under construction, plus what the answer key needs to know."""
 
     product: Product
     fields: dict[str, Any]
@@ -143,7 +142,7 @@ class Listing:
     sneaky_note: str | None = None
 
 
-# --- Helpers ----------------------------------------------------------------------
+# --- Helpers ------------------------------------------------------------------
 
 
 def trade_for(product: Product) -> str:
@@ -203,7 +202,7 @@ def sale_date(listing: Listing, ctx: Context) -> str:
     return (ctx.snapshot - timedelta(days=days_ago)).isoformat()
 
 
-# --- Step 1: the choices a listing is built around --------------------------------
+# --- Choices a listing is built around ----------------------------------------
 
 
 def choose_maker(product: Product, plan: Plan, hard: dict, ctx: Context):
@@ -257,7 +256,7 @@ def choose_story(product: Product, plan: Plan, hard: dict, ctx: Context) -> Pric
     return prices.honest_sale(base, rng) if rng.random() < 0.3 else prices.steady(base, rng)
 
 
-# --- Step 2: a listing that follows every rule --------------------------------------
+# --- A listing that follows every rule ----------------------------------------
 
 
 def correct_fields(listing: Listing, ctx: Context) -> None:
@@ -304,7 +303,7 @@ def correct_fields(listing: Listing, ctx: Context) -> None:
         )
 
 
-# --- Step 3: traps (look wrong, are legal) --------------------------------------------
+# --- Traps (look wrong, are legal) --------------------------------------------
 
 
 def explain_trap(trap: str, listing: Listing, ctx: Context) -> str:
@@ -369,7 +368,7 @@ def explain_trap(trap: str, listing: Listing, ctx: Context) -> str:
     raise ValueError(trap)
 
 
-# --- Step 4: problems (break one rule each) ----------------------------------------------
+# --- Problems (break one rule each) -------------------------------------------
 
 
 def plant(problem: str, listing: Listing, plan: Plan, ctx: Context, hard: bool) -> dict:
@@ -497,7 +496,7 @@ def add_sneaky_note(listing: Listing, ctx: Context) -> None:
     listing.sneaky_note = note
 
 
-# --- Putting it together ------------------------------------------------------------------
+# --- Putting it together ------------------------------------------------------
 
 
 def build_listing(product: Product, plan: Plan, ctx: Context, fields: dict) -> Listing:

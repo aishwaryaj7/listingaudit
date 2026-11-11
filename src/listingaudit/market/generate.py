@@ -1,10 +1,8 @@
-"""Build one split (practice or exam) of the pretend marketplace.
+"""Generate one split (practice or exam) of the marketplace.
 
-Everything random comes from the split's seed: NumPy turns it into two separate
-streams of random numbers, one to choose the products and one to build the
-listings, and Faker is seeded with it too. The same seed always builds exactly
-the same split; a different seed builds a different one with the same mix of
-problems.
+All randomness comes from the split's seed, which seeds both NumPy and Faker.
+The same seed always builds the same split; a different seed gives a different
+split with the same mix of problems.
 """
 
 from collections import defaultdict

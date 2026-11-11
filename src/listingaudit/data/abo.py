@@ -5,13 +5,13 @@ A raw ABO record stores most text fields as a list of translations:
     "color": [{"language_tag": "de_DE", "value": "Blau"},
               {"language_tag": "en_US", "value": "Blue"}]
 
-For each listing we pick one language and take every text field in that
-language, so a row never mixes German and English.
+Each listing is read in a single language, so a row never mixes German and
+English text.
 """
 
 from typing import Any
 
-# English first (easiest to read and to prompt with), then German (target market)
+# English first, then German (the target market)
 LANGUAGE_PREFERENCE = (
     "en_GB",
     "en_US",
@@ -23,7 +23,7 @@ LANGUAGE_PREFERENCE = (
     "de_DE",
 )
 
-# ABO gives weights in several units. We store everything in grams.
+# ABO weights come in mixed units; everything is stored in grams
 GRAMS_PER_UNIT = {
     "milligrams": 0.001,
     "grams": 1.0,
@@ -78,8 +78,7 @@ def parse_listing(record: Record) -> dict[str, Any]:
     product_types = record.get("product_type") or []
     nodes = record.get("node") or []
 
-    # Brand names are the same in every language, so if there is no brand in the
-    # chosen language we fall back to whatever brand value exists.
+    # Brand names aren't translated, so fall back to a brand in any language
     brands = record.get("brand") or []
     brand = first_localized(brands, lang) or (str(brands[0]["value"]) if brands else None)
 

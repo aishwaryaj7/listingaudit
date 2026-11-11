@@ -1,10 +1,10 @@
-"""Build the pretend marketplace and its answer key, and save both to Postgres.
+"""Build the synthetic marketplace and its answer key in Postgres.
 
     uv run python -m listingaudit.market.build
 
-Builds a practice set and an exam set of 400 listings each from the products
-downloaded in step 1. Running it again rebuilds both from scratch, and because
-the seeds and the snapshot date are fixed, the data comes out exactly the same.
+Generates a practice split and an exam split of 400 listings each from the ABO
+catalogue. Seeds and the snapshot date are fixed, so every rebuild produces
+the same data.
 """
 
 from collections import Counter
@@ -21,12 +21,12 @@ from listingaudit.market.generate import SplitResult, choose_products, generate_
 from listingaudit.market.models import Case, Offer, PricePoint, Problem, Seller, Trap
 
 MARKET_SCHEMA_FILE = PROJECT_ROOT / "db" / "market.sql"
-# "Today" on the pretend marketplace. Fixed, so the data doesn't change with the date.
+# Fixed "today" for the marketplace, so the data doesn't depend on the run date
 SNAPSHOT_DATE = date(2026, 11, 2)
-# One seed per split. The exam set gets products the practice set doesn't use.
+# One seed per split; later splits skip products used by earlier ones
 SEEDS = {"practice": 42, "exam": 4242}
 
-# Where each part of a split goes, in an order that respects the foreign keys
+# Destination table for each part of a split, in foreign-key order
 TABLES: list[tuple[str, type[BaseModel], str]] = [
     ("market.sellers", Seller, "sellers"),
     ("market.offers", Offer, "offers"),
@@ -40,14 +40,14 @@ TABLES: list[tuple[str, type[BaseModel], str]] = [
 def build_splits(
     catalogue: list[Product], photos: list[Photo], seeds: dict[str, int] = SEEDS
 ) -> dict[str, SplitResult]:
-    """Generate every split, so that no two splits show the same product or photo.
+    """Generate all splits so that no product or photo appears in more than one.
 
-    Every split chooses its products first. Only then are photos swapped in, and
-    only photos of products that no split sells. (Otherwise the practice set
-    could use up, as a photo, a candle the exam set needs to sell.)
+    Products are chosen for every split before any photos are swapped in, and only
+    photos of unsold products are used. Otherwise one split could use up, as a
+    swap photo, a product that another split needs to sell.
     """
     chosen: dict[str, list[Product]] = {}
-    shown: set[str] = set()  # products on sale, or whose photo is shown
+    shown: set[str] = set()  # item_ids already used, as a listing or as a photo
     for split, seed in seeds.items():
         chosen[split] = choose_products(catalogue, seed, exclude=shown)
         shown |= {p.item_id for p in chosen[split]}
@@ -64,7 +64,7 @@ def build_splits(
 
 
 def copy_rows(cur: Cursor, table: str, model: type[BaseModel], rows: list[BaseModel]) -> None:
-    """Write rows with COPY, the fastest way to put many rows into Postgres."""
+    """Bulk-load rows with COPY."""
     columns = list(model.model_fields)
     statement = sql.SQL("COPY {} ({}) FROM STDIN").format(
         sql.Identifier(*table.split(".")), sql.SQL(", ").join(map(sql.Identifier, columns))
@@ -81,7 +81,7 @@ def _adapt(value):
 
 
 def grant_agent_access(cur: Cursor) -> None:
-    """Give the agent a login that can read the marketplace and nothing else."""
+    """Create or update the agent's login role, with read access to the market schema."""
     agent = sql.Identifier(settings.agent_db_user)
     password = sql.Literal(settings.agent_db_password)
     exists = cur.execute(
@@ -108,7 +108,7 @@ def save(cur: Cursor, results: dict[str, SplitResult]) -> None:
 
 
 def summary(results: dict[str, SplitResult]) -> str:
-    lines = [f"Built the pretend marketplace as of {SNAPSHOT_DATE}:"]
+    lines = [f"Built the synthetic marketplace as of {SNAPSHOT_DATE}:"]
     for split, r in results.items():
         kinds = Counter(case.kind for case in r.cases)
         lines.append(
@@ -127,7 +127,7 @@ def main() -> None:
     with connect() as conn, conn.cursor() as cur:
         products, photos = load_catalogue(conn)
         if not products:
-            raise SystemExit("No products found. Run the step 1 scripts first (see README).")
+            raise SystemExit("No products found. Load the ABO catalogue first (see README).")
         results = build_splits(products, photos)
         save(cur, results)
     print(summary(results))

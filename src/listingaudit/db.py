@@ -1,4 +1,4 @@
-"""Small helpers for talking to Postgres."""
+"""Postgres connection helpers."""
 
 import psycopg
 
@@ -12,10 +12,10 @@ def connect() -> psycopg.Connection:
 
 
 def connect_as_agent() -> psycopg.Connection:
-    """Log in as the agent, who may read the marketplace but not the answer key."""
+    """Connect with the agent's read-only role."""
     return psycopg.connect(settings.agent_database_url)
 
 
 def apply_schema(conn: psycopg.Connection) -> None:
-    """Create the tables if they don't exist yet. Safe to run many times."""
+    """Create the catalogue tables if they don't exist."""
     conn.execute(SCHEMA_FILE.read_text())

@@ -1,14 +1,12 @@
-"""Choose the real ABO products our pretend marketplace sells.
+"""Select the ABO products the marketplace sells, with the facts read from their text.
 
-The generator needs a few facts that are hidden in the product text:
-
-- what kind of product it is, because that decides which rules apply
-- the pack size of groceries and cosmetics, for the price per kilo or litre
-- the colour family, so we can swap photos between different colours
+- the kind of product, which decides the rules that apply
+- the pack size of groceries and cosmetics, for unit prices
+- the colour family, for swapping photos between colours
 - the fibre composition of textiles
 
-Products where we can't read these facts with confidence are left out. A wrong
-guess here would put a rule break into the data that is not in the answer key.
+Products where any of these is unclear are dropped. A wrong guess would put a
+rule break into the data that the answer key doesn't know about.
 """
 
 import re
@@ -117,9 +115,9 @@ COUNT_WORDS = re.compile(
     r"\b\d+\s*(?:count|ct|capsules|pods|bags|bars|pieces|refills?)\b|with \d+ refills",
     re.IGNORECASE,
 )
-# In US titles, plain "ounces" on a liquid usually means fluid ounces. We decide by
-# the product's main noun: "Jojoba Oil, 4 oz" is a liquid, "Cream with Eucalyptus Oil"
-# is not. (Not "sauce": a "24 oz" jar of pasta sauce is sold by weight.)
+# In US titles, plain "ounces" on a liquid usually means fluid ounces. The main noun
+# decides: "Jojoba Oil, 4 oz" is a liquid, "Cream with Eucalyptus Oil" is not.
+# (Not "sauce": a "24 oz" jar of pasta sauce is sold by weight.)
 LIQUID_NOUNS = {
     "shampoo", "conditioner", "wash", "gel", "lotion", "oil", "juice", "syrup", "water",
     "detergent", "dressing", "cleanser", "cleaner", "vinegar", "extract", "restorer",
@@ -166,8 +164,8 @@ def pack_size(title: str) -> PackSize | None:
     sizes = _sizes(title)
     if not sizes:
         return None
-    # The same size is often given twice, e.g. "1.7 Fluid Ounce (50 mL)". Then we
-    # take the metric one, because that is what the label says in the EU.
+    # The same size is often given twice, e.g. "1.7 Fluid Ounce (50 mL)". Prefer
+    # the metric one, which is what an EU label shows.
     amount, unit, _ = max(sizes, key=lambda s: s[2])
     for other_amount, other_unit, _ in sizes:
         if other_unit != unit or abs(other_amount - amount) > 0.05 * amount:
@@ -279,7 +277,7 @@ def _normalise_part(text: str) -> str | None:
     pairs = PERCENT_FIBRE.findall(text)
     leftover = PERCENT_FIBRE.sub("", text)
     if not pairs or re.search(r"[a-z]{3,}", leftover, re.IGNORECASE):
-        return None  # empty, or words we don't understand (e.g. "Cotton Duck")
+        return None  # empty, or unknown words (e.g. "Cotton Duck")
     if sum(int(p) for p, _ in pairs) != 100:
         return None
     return ", ".join(f"{p}% {EU_FIBRE_NAMES[f.lower()]}" for p, f in pairs)
@@ -360,8 +358,8 @@ def classify(product_type: str, text: str, title: str) -> Kind | None:
         return "light_bulb"
     if product_type in LAMP_TYPES:
         # A lamp with built-in LEDs that can't be taken out counts as a light source
-        # itself, and then needs a label. We can't tell from the text, so we skip
-        # LED lamps unless they take a separate bulb.
+        # itself and needs a label. The text rarely says which, so LED lamps are
+        # skipped unless they take a separate bulb.
         if INTEGRATED_LED.search(text) and "bulb" not in text.lower():
             return None
         return "lamp"
@@ -369,7 +367,7 @@ def classify(product_type: str, text: str, title: str) -> Kind | None:
         if is_mixed_set(title):
             return "mixed_set"
         pack = pack_size(title)
-        # Packs under 10 g or 10 ml don't need a unit price, so we leave them out
+        # Packs under 10 g or 10 ml are exempt from unit pricing
         return "unit_price" if pack and pack.each >= 10 else None
     if product_type == "CANDLE":
         # Only the candles themselves: a candle holder is not a fire risk on its own
@@ -397,7 +395,7 @@ ORDER BY l.item_id, l.domain_name
 
 
 def make_product(row) -> Product | None:
-    """Turn one row of CANDIDATES into a Product, or None if we can't use it."""
+    """Build a Product from one CANDIDATES row, or None if it can't be used."""
     title, bullets = row.item_name, row.bullet_points or []
     text = " ".join([title, *bullets, row.description or ""])
     kind = classify(row.product_type, text, title)
@@ -408,7 +406,7 @@ def make_product(row) -> Product | None:
     if kind == "textile":
         fibres = normalise_composition(row.fabric_type)
         if fibres is None and ANY_PERCENT_FIBRE.search(f"{row.fabric_type or ''} {text}"):
-            return None  # it states a composition we can't read: too risky to use
+            return None  # states a composition that can't be parsed: too risky
 
     return Product(
         item_id=row.item_id,
@@ -440,10 +438,10 @@ class Photo:
 
 
 def load_catalogue(conn: psycopg.Connection) -> tuple[list[Product], list[Photo]]:
-    """All products we can sell, and all photos we can swap, in a fixed order.
+    """All sellable products and all swappable photos, in a fixed order.
 
     Any downloaded photo with a clear colour can be swapped in, including photos of
-    products we don't sell.
+    products that aren't sold.
     """
     with conn.cursor(row_factory=namedtuple_row) as cur:
         rows = cur.execute(CANDIDATES).fetchall()
