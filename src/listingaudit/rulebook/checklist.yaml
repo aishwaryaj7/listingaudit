@@ -1,0 +1,205 @@
+# Rules checklist: what the agent checks in a listing, and the legal basis.
+#
+# Simplified, not legal advice. Findings say "possible problem under <article>",
+# never "illegal".
+#
+# - rules: one entry per rule, with the ids used in market/rules.py
+# - product_kinds: the rules each kind of product needs. Working out the kind is
+#   part of the agent's job: a curtain rod in the curtain category is not a
+#   textile, and a lamp is not a light bulb.
+# - product_types: extra rules for some product types, whatever their kind
+# - every_listing: rules that depend on the listing, not on the product
+#
+# `law` is a source id from rulebook/sources.py; `article` is an article number
+# (EU law) or a § number (German law).
+
+rules:
+  prior_price:
+    name: Honest discounts (the 30-day rule)
+    summary: >-
+      When a listing announces a price reduction, the crossed-out "was" price must be the
+      lowest price the seller charged in the 30 days before the reduction started, and a
+      percentage badge must be calculated from that price.
+    checks:
+      - The crossed-out price is the lowest price of the 30 days before the reduction started.
+      - The percentage badge, if any, is calculated from that lowest price.
+    not_a_problem:
+      - A price that was raised more than 30 days before the sale and then reduced.
+      - "A sale that started earlier: the 30 days count back from the first day of the sale."
+      - A comparison with the manufacturer's recommended retail price (RRP) is not a price reduction.
+      - A lower price with no crossed-out price and no badge announces no reduction.
+    fields: [price, was_price, was_price_kind, discount_percent, price_history]
+    checked_by: code
+    severity: high
+    law:
+      - {law: pid, article: "6a", paragraph: "1"}
+      - {law: pid, article: "6a", paragraph: "2"}
+      - {law: pangv, article: "11", paragraph: "1"}
+      - {law: pid_guidance, article: "2.1"}
+      - {law: aldi_sued, article: operative part}
+
+  manufacturer_info:
+    name: Who made it
+    summary: >-
+      A non-food product sold online shows the manufacturer's name and both a postal and
+      an electronic address (email or website) where they can be contacted.
+    checks:
+      - The manufacturer's name is shown.
+      - A postal address is shown.
+      - An email address or a website is shown.
+    not_a_problem:
+      - Food is outside the General Product Safety Regulation.
+    fields: [manufacturer_name, manufacturer_address, manufacturer_country, manufacturer_email, manufacturer_website]
+    checked_by: code
+    severity: high
+    law:
+      - {law: gpsr, article: "19", point: a}
+      - {law: gpsr, article: "2", paragraph: "2"}
+
+  eu_responsible_person:
+    name: A responsible person in the EU
+    summary: >-
+      If the manufacturer is not established in the EU, the listing also shows a
+      responsible person based in the EU, with a postal and an electronic address.
+    checks:
+      - The responsible person's name is shown.
+      - Their postal address is in the EU.
+      - Their email address is shown.
+    not_a_problem:
+      - A manufacturer based in the EU needs no separate responsible person.
+    fields: [manufacturer_country, eu_rp_name, eu_rp_address, eu_rp_email]
+    checked_by: code
+    severity: high
+    law:
+      - {law: gpsr, article: "19", point: b}
+      - {law: gpsr, article: "16", paragraph: "1"}
+
+  safety_warnings:
+    name: Safety warnings
+    summary: >-
+      Products that come with warnings or safety information (candles, electric products,
+      cleaning products, cosmetics) show them in the listing, in a language the buyer
+      understands.
+    checks:
+      - The listing shows the product's warnings or safety information.
+    not_a_problem: []
+    fields: [safety_warnings]
+    checked_by: code
+    severity: high
+    law:
+      - {law: gpsr, article: "19", point: d}
+
+  unit_price:
+    name: Price per kilo or litre
+    summary: >-
+      Goods sold by weight or volume show the price per 1 kg or 1 litre next to the price.
+    checks:
+      - A unit price is shown for 1 kg or 1 litre (100 g or 100 ml only for loose goods).
+      - The unit price matches the price and the pack size.
+    not_a_problem:
+      - It may be left out when it equals the price (a 1 kg or 1 litre pack).
+      - Sets of different products that are not mixed together need no unit price.
+      - Goods sold by the piece need no unit price.
+    fields: [price, net_quantity, unit_price, unit_price_per]
+    checked_by: code
+    severity: medium
+    law:
+      - {law: pangv, article: "4", paragraph: "1"}
+      - {law: pangv, article: "4", paragraph: "3"}
+      - {law: pangv, article: "5", paragraph: "1"}
+      - {law: pid, article: "3", paragraph: "1"}
+
+  fibre_composition:
+    name: Fabric content
+    summary: >-
+      A textile product shows its fibre composition before the purchase, also online,
+      using the EU fibre names with percentages by weight (for example "60% cotton,
+      40% viscose", not "rayon" or "cotton feel").
+    checks:
+      - A fibre composition is shown.
+      - Every fibre name is an EU fibre name.
+      - Each fibre has a percentage, and the percentages add up to 100.
+    not_a_problem:
+      - Products that are not textiles, such as curtain rods, need no fibre composition.
+    fields: [fibre_composition]
+    checked_by: code
+    severity: medium
+    law:
+      - {law: textile, article: "16", paragraph: "1"}
+      - {law: textile, article: "9", paragraph: "1"}
+      - {law: textile, article: "5", paragraph: "1"}
+
+  energy_label:
+    name: Energy label
+    summary: >-
+      A light bulb sold on its own shows its energy label near the price and links its
+      product information sheet.
+    checks:
+      - The energy class is shown.
+      - The energy label is shown or linked.
+      - The product information sheet is linked.
+    not_a_problem:
+      - Lamps and light fittings have had no energy label of their own since September 2021.
+    fields: [energy_class, energy_label_url, product_sheet_url]
+    checked_by: code
+    severity: medium
+    law:
+      - {law: energy_label, article: "5", paragraph: "1"}
+      - {law: light_sources, article: "4"}
+      - {law: light_sources, article: "Annex VIII"}
+
+  photo_matches_text:
+    name: Truthful photos and text
+    summary: >-
+      The photo shows the product the text describes: the same colour, material and type
+      of product.
+    checks:
+      - The colour in the photo matches the colour in the text.
+      - The product in the photo is the product the text describes.
+    not_a_problem:
+      - A badly lit photo can look a slightly different shade. Flag only clear mismatches.
+    fields: [image_file, title, color, description, bullet_points]
+    checked_by: image_model
+    severity: medium
+    law:
+      - {law: ucpd, article: "6", paragraph: "1"}
+
+product_kinds:
+  textile:
+    description: Made mainly of textile fibres, such as rugs, cushions, bed sheets and curtains.
+    rules: [fibre_composition]
+  not_textile:
+    description: Sold in a textile category but not made of fibres, such as curtain rods and hooks.
+    rules: []
+  light_bulb:
+    description: A light source sold on its own, such as an LED bulb.
+    rules: [safety_warnings, energy_label]
+  lamp:
+    description: A lamp or light fitting, with or without a bulb.
+    rules: [safety_warnings]
+  unit_price:
+    description: Sold by weight or volume, such as coffee, shampoo or cleaning liquid.
+    rules: [unit_price]
+  mixed_set:
+    description: A set of different products, such as a gift box of shampoo and lotion.
+    rules: []
+  candle:
+    description: A candle, sold by the piece.
+    rules: [safety_warnings]
+  general:
+    description: Anything else, such as furniture, shoes and decoration.
+    rules: []
+
+product_types:
+  CLEANING_AGENT: [safety_warnings]
+  SKIN_CLEANING_AGENT: [safety_warnings]
+  SKIN_MOISTURIZER: [safety_warnings]
+  SHAMPOO: [safety_warnings]
+
+every_listing:
+  prior_price: announces_price_reduction
+  manufacturer_info: not_food
+  eu_responsible_person: not_food_and_maker_outside_eu
+  photo_matches_text: always
+
+food_product_types: [GROCERY, COFFEE, TEA, SNACK_FOOD_BAR]
