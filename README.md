@@ -6,8 +6,8 @@ information (GPSR), unit prices, textile fibre labels, energy labels, and photos
 match the description. It writes an audit report with evidence, and a human reviewer
 approves every finding.
 
-> Status: **step 3 of 10**, the rulebook: a rules checklist and a searchable copy of the
-> laws, with citations. The agent itself comes in later steps.
+> Status: **step 4 of 10**, the checking tools: plain code, no AI, for the rules that are
+> about numbers, names and missing fields. The agent itself comes in later steps.
 
 ## What's here so far
 
@@ -39,11 +39,24 @@ approves every finding.
   link to the official text.
 - **A search evaluation** on 31 test questions: meaning search finds a right article among
   the first five results for 84% of them, hybrid search for 68%, keyword search for 45%.
+- **Checking tools in plain code**: the 30-day price rule, checked against the price
+  history; the price per kg or litre, including multipacks such as "3 x 250 ml"; the
+  fibre composition (EU fibre names, percentages, largest first); and the required
+  product information (manufacturer, responsible person in the EU, safety warnings,
+  energy label). Each check returns a typed result with one of four statuses (ok,
+  problem, not applicable, can't check), the findings with the facts that show them, and
+  the articles of law it applies.
+- **A score against the answer key**: on the 400 practice listings the checks catch 202 of
+  the 212 planted problems they look for, with no false alarms, and none of the traps is
+  flagged. The 10 they miss show safety warnings that are there but wrong for the
+  product, which takes judgement. Photos that don't match the text need an image model.
 - Notebooks exploring the data: `notebooks/01_explore_abo.ipynb`,
-  `notebooks/02_explore_market.ipynb` and `notebooks/03_explore_rulebook.ipynb`.
+  `notebooks/02_explore_market.ipynb`, `notebooks/03_explore_rulebook.ipynb` and
+  `notebooks/04_explore_checks.ipynb`.
 - Tests for the data cleaning, the marketplace generator (including a check that every
   listing breaks exactly the rules the answer key says it does), the law page parsers, the
-  chunking, the checklist and the search.
+  chunking, the checklist, the search and the checking tools (including a check that
+  every fibre name in Annex I of the Textile Regulation is accepted).
 
 ## Quick start
 
@@ -80,7 +93,11 @@ uv run pytest
 # 9. Measure the search on the test questions
 uv run python -m listingaudit.rulebook.evaluate
 
-# 10. Explore the data
+# 10. Score the checking tools on the practice listings, or check one listing
+uv run python -m listingaudit.checks.evaluate
+uv run python -m listingaudit.checks.run P0099 prior_price
+
+# 11. Explore the data
 uv run jupyter lab notebooks/
 ```
 
@@ -122,6 +139,13 @@ src/listingaudit/rulebook/build.py        builds the rulebook in Postgres
 src/listingaudit/rulebook/search.py       keyword, meaning and hybrid search
 src/listingaudit/rulebook/questions.yaml  test questions with their right answers
 src/listingaudit/rulebook/evaluate.py     scores the search methods on the test questions
+src/listingaudit/checks/results.py        what a check returns: status, findings, facts, law
+src/listingaudit/checks/prior_price.py    the 30-day price rule
+src/listingaudit/checks/unit_price.py     the price per kg or litre
+src/listingaudit/checks/fibres.py         fibre names and percentages
+src/listingaudit/checks/product_info.py   manufacturer, responsible person, warnings, energy label
+src/listingaudit/checks/run.py            runs the checks on listings
+src/listingaudit/checks/evaluate.py       scores the checks against the answer key
 notebooks/                                data exploration
 tests/                                    tests
 data/                                     downloaded files (not in git)
