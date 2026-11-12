@@ -1,8 +1,11 @@
-"""Shared test data: a made-up catalogue, so the generator tests need no database."""
+"""Shared test data: a made-up catalogue for the generator tests, and listings for the checks."""
+
+from decimal import Decimal
 
 import pytest
 
 from listingaudit.market.catalogue import PackSize, Photo, Product, colour_family
+from listingaudit.market.models import Offer
 
 COLOURS = [
     "Navy Blue", "Ivory", "Charcoal Grey", "Black", "Sage Green",
@@ -93,3 +96,31 @@ def made_up_catalogue() -> tuple[list[Product], list[Photo]]:
 @pytest.fixture(scope="session")
 def made_up():
     return made_up_catalogue()
+
+
+@pytest.fixture
+def make_offer():
+    """Build a complete, plain listing; keyword arguments change its fields."""
+
+    def make(**changes) -> Offer:
+        fields = {
+            "offer_id": "P0001",
+            "split": "practice",
+            "seller_id": 1,
+            "product_type": "PILLOW",
+            "title": "Test Pillow",
+            "brand": "Testbrand",
+            "color": "Navy Blue",
+            "bullet_points": ["A first bullet point."],
+            "description": "A product made up for the tests.",
+            "image_id": "img0001",
+            "image_file": "images/test/0001.jpg",
+            "price": Decimal("19.99"),
+            "manufacturer_name": "Testmaker GmbH",
+            "manufacturer_address": "Hauptstraße 1, 10115 Berlin, Germany",
+            "manufacturer_country": "Germany",
+            "manufacturer_email": "info@testmaker.example",
+        }
+        return Offer(**(fields | changes))
+
+    return make
