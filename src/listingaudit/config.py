@@ -2,6 +2,7 @@
 
 from pathlib import Path
 
+from pydantic import SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
@@ -23,6 +24,17 @@ class Settings(BaseSettings):
     abo_base_url: str = "https://amazon-berkeley-objects.s3.amazonaws.com"
     # Hugging Face model used to embed the rulebook
     embedding_model: str = "intfloat/multilingual-e5-small"
+    # CLIP model for the photo check: an open_clip model name and its weights. OpenAI's
+    # weights need the -quickgelu variant, the activation they were trained with.
+    clip_model: str = "ViT-B-32-quickgelu"
+    clip_pretrained: str = "openai"
+
+    # Vision language model for photos CLIP can't settle. For Azure OpenAI, the URL
+    # is https://<resource>.openai.azure.com/openai/v1/ and the model is the
+    # deployment name; for the OpenAI API, leave the URL empty.
+    vision_base_url: str | None = None
+    vision_api_key: SecretStr | None = None
+    vision_model: str = "gpt-5-mini"
 
     @property
     def database_url(self) -> str:
