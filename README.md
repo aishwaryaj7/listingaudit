@@ -6,8 +6,8 @@ information (GPSR), unit prices, textile fibre labels, energy labels, and photos
 match the description. It writes an audit report with evidence, and a human reviewer
 approves every finding.
 
-> Status: **step 4 of 10**, the checking tools: plain code, no AI, for the rules that are
-> about numbers, names and missing fields. The agent itself comes in later steps.
+> Status: **step 5 of 10**, the photo checker: a small image model (CLIP) compared with a
+> vision language model on Azure OpenAI. The agent itself comes in later steps.
 
 ## What's here so far
 
@@ -50,13 +50,29 @@ approves every finding.
   the 212 planted problems they look for, with no false alarms, and none of the traps is
   flagged. The 10 they miss show safety warnings that are there but wrong for the
   product, which takes judgement. Photos that don't match the text need an image model.
+- **A photo checker** that compares the photo with the listing's colour field. CLIP
+  (OpenAI's ViT-B/32, run locally with open_clip) scores the photo against sentences for
+  13 colour families, with no training (zero-shot), and settles the clear cases. The
+  photos it can't settle go to a vision language model (gpt-5-mini on Azure OpenAI),
+  which answers in a fixed JSON structure, or to the reviewer when none is set up. CLIP's
+  two thresholds were picked on spare photos that no practice or exam listing shows.
+- **A comparison on the planted photo swaps**: 210 practice listings name one clear
+  colour, and 30 of their photos were swapped for a product in another colour. CLIP alone
+  catches 8 swaps, with 3 false alarms, and leaves 58 photos (28%) to the reviewer.
+  gpt-5-mini alone catches 24 (all 15 easy swaps and 9 of the 15 hard ones) and leaves 1,
+  but flags 15 fitting photos. Some of those, such as a "Black" bed base shown in white,
+  are real errors in the source catalogue that the answer key doesn't know about. CLIP
+  first, with gpt-5-mini deciding only the photos CLIP can't settle, catches 19 with 13
+  false alarms and leaves none to the reviewer, for about 0.08 USD per 1,000 listings at
+  the list price instead of 0.27.
 - Notebooks exploring the data: `notebooks/01_explore_abo.ipynb`,
-  `notebooks/02_explore_market.ipynb`, `notebooks/03_explore_rulebook.ipynb` and
-  `notebooks/04_explore_checks.ipynb`.
+  `notebooks/02_explore_market.ipynb`, `notebooks/03_explore_rulebook.ipynb`,
+  `notebooks/04_explore_checks.ipynb` and `notebooks/05_explore_photos.ipynb`.
 - Tests for the data cleaning, the marketplace generator (including a check that every
   listing breaks exactly the rules the answer key says it does), the law page parsers, the
-  chunking, the checklist, the search and the checking tools (including a check that
-  every fibre name in Annex I of the Textile Regulation is accepted).
+  chunking, the checklist, the search, the checking tools (including a check that every
+  fibre name in Annex I of the Textile Regulation is accepted) and the photo check (with
+  stand-ins for the models, so the tests cost nothing).
 
 ## Quick start
 
@@ -97,7 +113,12 @@ uv run python -m listingaudit.rulebook.evaluate
 uv run python -m listingaudit.checks.evaluate
 uv run python -m listingaudit.checks.run P0099 prior_price
 
-# 11. Explore the data
+# 11. Score the photo check on the practice listings, or check one photo. The first
+#     run downloads CLIP (~600 MB) into data/models.
+uv run python -m listingaudit.photos.evaluate
+uv run python -m listingaudit.photos.check P0262
+
+# 12. Explore the data
 uv run jupyter lab notebooks/
 ```
 
@@ -106,6 +127,37 @@ The marketplace build always gives the same data: the random seeds and the marke
 Faker that generate it.
 
 On Windows PowerShell, use `copy .env.example .env` in step 1. Everything else is the same.
+
+### The vision model (optional)
+
+The photo check works without it: photos CLIP can't settle then go to the reviewer. To
+compare CLIP with a vision language model on Azure OpenAI:
+
+1. In the Azure portal, create an **Azure OpenAI** resource (pricing tier Standard S0).
+2. In its Foundry portal, deploy **gpt-5-mini** with the deployment type
+   **Global Standard**, and name the deployment `gpt-5-mini`. If the portal reports
+   insufficient quota, the [Quota](https://ai.azure.com/resource/quota) page shows which
+   models the subscription can deploy.
+3. Copy the key and the resource name from the resource's **Keys and Endpoint** page into
+   `.env`:
+
+   ```bash
+   VISION_BASE_URL=https://<resource-name>.openai.azure.com/openai/v1/
+   VISION_API_KEY=<key>
+   VISION_MODEL=gpt-5-mini
+   ```
+
+4. Ask the vision model about the practice photos (210 photos, about 10 minutes and
+   0.11 USD at the list price), and see the comparison:
+
+   ```bash
+   uv run python -m listingaudit.photos.evaluate --vision
+   ```
+
+The answers are saved in `data/results`, so later runs and the notebook don't pay for
+them again. `VISION_MODEL` is the deployment name, and for the OpenAI API instead of
+Azure, leave out `VISION_BASE_URL`. To see how CLIP's thresholds were picked, run
+`uv run python -m listingaudit.photos.tune`.
 
 ## Project layout
 
@@ -146,6 +198,12 @@ src/listingaudit/checks/fibres.py         fibre names and percentages
 src/listingaudit/checks/product_info.py   manufacturer, responsible person, warnings, energy label
 src/listingaudit/checks/run.py            runs the checks on listings
 src/listingaudit/checks/evaluate.py       scores the checks against the answer key
+src/listingaudit/photos/colours.py        colour names to colour families
+src/listingaudit/photos/clip.py           CLIP's colour scores for a photo
+src/listingaudit/photos/vision.py         asks a vision language model about a photo
+src/listingaudit/photos/check.py          the photo check: CLIP first, then the vision model
+src/listingaudit/photos/tune.py           picks CLIP's thresholds on spare photos
+src/listingaudit/photos/evaluate.py       scores CLIP, the vision model and both
 notebooks/                                data exploration
 tests/                                    tests
 data/                                     downloaded files (not in git)
@@ -165,7 +223,11 @@ authorised by Commission Decision 2011/833/EU) and from
 [gesetze-im-internet.de](https://www.gesetze-im-internet.de) (German laws are official works
 without copyright, § 5 UrhG). The embedding model is
 [intfloat/multilingual-e5-small](https://huggingface.co/intfloat/multilingual-e5-small)
-(MIT licence).
+(MIT licence). The photo check uses OpenAI's CLIP ViT-B/32 (MIT licence) through
+[open_clip](https://github.com/mlfoundations/open_clip) (MIT licence).
+
+> Radford, A., et al. "Learning Transferable Visual Models From Natural Language
+> Supervision." ICML 2021.
 
 Sellers, manufacturers, prices and addresses in the marketplace are made up. Their email
 addresses and websites use the reserved `.example` domain, so none can belong to a real
