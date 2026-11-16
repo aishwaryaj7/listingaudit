@@ -6,8 +6,8 @@ information (GPSR), unit prices, textile fibre labels, energy labels, and photos
 match the description. It writes an audit report with evidence, and a human reviewer
 approves every finding.
 
-> Status: **step 5 of 10**, the photo checker: a small image model (CLIP) compared with a
-> vision language model on Azure OpenAI. The agent itself comes in later steps.
+> Status: **step 6 of 10**, the toolbox: an MCP server that offers the checks and the
+> rulebook search to any AI agent. The agent itself comes in later steps.
 
 ## What's here so far
 
@@ -65,14 +65,23 @@ approves every finding.
   first, with gpt-5-mini deciding only the photos CLIP can't settle, catches 19 with 13
   false alarms and leaves none to the reviewer, for about 0.08 USD per 1,000 listings at
   the list price instead of 0.27.
+- **A toolbox for agents**: an MCP server (Model Context Protocol, built with FastMCP from
+  the official Python SDK) that any MCP client can start. It offers five read-only tools
+  (read a listing, find the rules it has to follow, run the code checks, check the photo,
+  search the rulebook), the rules checklist, the law texts and the listing photos as
+  resources, and a prompt with the steps of an audit and the template for its report. The
+  descriptions and argument schemas are written for the model, every tool returns a typed
+  result, and the server reads listings with the agent's read-only database login.
 - Notebooks exploring the data: `notebooks/01_explore_abo.ipynb`,
   `notebooks/02_explore_market.ipynb`, `notebooks/03_explore_rulebook.ipynb`,
-  `notebooks/04_explore_checks.ipynb` and `notebooks/05_explore_photos.ipynb`.
+  `notebooks/04_explore_checks.ipynb`, `notebooks/05_explore_photos.ipynb` and
+  `notebooks/06_explore_toolbox.ipynb`.
 - Tests for the data cleaning, the marketplace generator (including a check that every
   listing breaks exactly the rules the answer key says it does), the law page parsers, the
   chunking, the checklist, the search, the checking tools (including a check that every
-  fibre name in Annex I of the Textile Regulation is accepted) and the photo check (with
-  stand-ins for the models, so the tests cost nothing).
+  fibre name in Annex I of the Textile Regulation is accepted), the photo check (with
+  stand-ins for the models, so the tests cost nothing) and the toolbox (through an MCP
+  client, the way an agent uses it).
 
 ## Quick start
 
@@ -118,7 +127,10 @@ uv run python -m listingaudit.checks.run P0099 prior_price
 uv run python -m listingaudit.photos.evaluate
 uv run python -m listingaudit.photos.check P0262
 
-# 12. Explore the data
+# 12. Try the toolbox in the MCP Inspector, in the browser (needs Node.js, see below)
+npx @modelcontextprotocol/inspector@2.13.0 -- uv run python -m listingaudit.toolbox.server
+
+# 13. Explore the data
 uv run jupyter lab notebooks/
 ```
 
@@ -158,6 +170,60 @@ The answers are saved in `data/results`, so later runs and the notebook don't pa
 them again. `VISION_MODEL` is the deployment name, and for the OpenAI API instead of
 Azure, leave out `VISION_BASE_URL`. To see how CLIP's thresholds were picked, run
 `uv run python -m listingaudit.photos.tune`.
+
+### The toolbox (MCP server)
+
+The checks and the rulebook search are offered to AI agents as an MCP server. An MCP
+client starts it as a subprocess and talks to it over stdin and stdout:
+
+```bash
+uv run python -m listingaudit.toolbox.server
+```
+
+| Tool | What it does |
+| --- | --- |
+| `get_listing` | Reads a listing as a shopper sees it |
+| `rules_for_listing` | Lists the rules a listing has to follow, given the kind of product, and the tool that checks each one |
+| `run_checks` | Runs the plain-code checks of some rules |
+| `check_photo` | Checks that the photo shows the listing's colour: CLIP first, then the vision model if one is set up |
+| `search_rulebook` | Finds the passages of the law texts that answer a question, with citations and links |
+
+Resources: `checklist://rules`, `checklist://rules/{rule}`, `rulebook://laws` and
+`listing://{offer_id}/photo`. Prompt: `audit_listing`, the steps of an audit and the
+template for its report.
+
+To try it by hand, the [MCP Inspector](https://github.com/modelcontextprotocol/inspector)
+opens a test page in the browser. It needs [Node.js](https://nodejs.org) 22.19 or newer.
+From the project folder, with the database running:
+
+```bash
+npx @modelcontextprotocol/inspector@2.13.0 -- uv run python -m listingaudit.toolbox.server
+```
+
+Turn on the server's switch, then open Tools, Resources or Prompts. The Inspector also has
+a command-line mode that prints the answers as JSON:
+
+```bash
+npx @modelcontextprotocol/inspector@2.13.0 --cli --method tools/call \
+  --tool-name get_listing --tool-arg offer_id=P0171 \
+  -- uv run python -m listingaudit.toolbox.server
+```
+
+To add the server to an MCP client, such as a desktop chat app, add this entry to the
+client's server settings, with the path to this folder:
+
+```json
+{
+  "mcpServers": {
+    "listingaudit": {
+      "command": "uv",
+      "args": ["run", "--directory", "/path/to/listingaudit", "python", "-m", "listingaudit.toolbox.server"]
+    }
+  }
+}
+```
+
+If the client can't find `uv`, give its full path, which `which uv` prints.
 
 ## Project layout
 
@@ -204,6 +270,8 @@ src/listingaudit/photos/vision.py         asks a vision language model about a p
 src/listingaudit/photos/check.py          the photo check: CLIP first, then the vision model
 src/listingaudit/photos/tune.py           picks CLIP's thresholds on spare photos
 src/listingaudit/photos/evaluate.py       scores CLIP, the vision model and both
+src/listingaudit/toolbox/server.py        the MCP server: tools, resources and a prompt
+src/listingaudit/toolbox/audit_prompt.md  the steps of an audit and its report template
 notebooks/                                data exploration
 tests/                                    tests
 data/                                     downloaded files (not in git)
