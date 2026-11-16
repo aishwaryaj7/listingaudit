@@ -36,6 +36,12 @@ class Settings(BaseSettings):
     vision_api_key: SecretStr | None = None
     vision_model: str = "gpt-5-mini"
 
+    # The agent's language models, on the same endpoint and key as the vision model.
+    # The large model takes over a report the small one can't get past the self-check;
+    # without one, the small model does everything.
+    agent_model: str = "gpt-5-mini"
+    agent_model_large: str | None = None
+
     @property
     def database_url(self) -> str:
         return (
