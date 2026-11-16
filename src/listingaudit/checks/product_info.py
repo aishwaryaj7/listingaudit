@@ -52,6 +52,14 @@ def address_country(address: str) -> str:
     return address.rsplit(",", 1)[-1].strip()
 
 
+def maker_country(offer: Offer) -> str | None:
+    """Where the manufacturer is based: the country field, or else the end of the address."""
+    country = offer.manufacturer_country
+    if is_missing(country) and not is_missing(offer.manufacturer_address):
+        country = address_country(offer.manufacturer_address)
+    return None if is_missing(country) else country
+
+
 def is_food(offer: Offer) -> bool:
     return offer.product_type in load_checklist().food_product_types
 
@@ -101,10 +109,8 @@ def check_eu_responsible_person(offer: Offer) -> CheckResult:
     rule = Rule.EU_RESPONSIBLE_PERSON
     if is_food(offer):
         return not_applicable(rule, FOOD)
-    country = offer.manufacturer_country
-    if is_missing(country) and not is_missing(offer.manufacturer_address):
-        country = address_country(offer.manufacturer_address)
-    if is_missing(country):
+    country = maker_country(offer)
+    if country is None:
         return cannot_check(rule, "The listing doesn't say where the manufacturer is based.")
     if in_eu(country):
         return not_applicable(
