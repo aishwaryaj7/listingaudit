@@ -6,6 +6,7 @@ A draft passes when
 - every quote is a passage the rulebook search really returned;
 - every price and percentage in its text is one the check worked out, since code does
   all the maths;
+- its summary gives the number of possible problems the checks found;
 - it never calls a listing illegal: a report names possible problems, and only a court
   or an authority can decide more.
 
@@ -29,6 +30,12 @@ AMOUNT = re.compile(
 # The comma of "€1,310.99", left out before reading an amount
 THOUSANDS = re.compile(r"(?<=\d),(?=\d{3}(?!\d))")
 NUMBER = re.compile(r"\d+(?:\.\d+)?")
+# A number of problems: "2 possible problems", "one problem", "three issues"
+COUNT = re.compile(
+    r"\b(\d+|one|two|three|four|five|six|seven|eight)\s+(?:possible\s+)?(?:problems?|issues?)\b",
+    re.IGNORECASE,
+)
+NUMBER_WORDS = ["one", "two", "three", "four", "five", "six", "seven", "eight"]
 VERDICT = re.compile(r"\b(?:illegal|unlawful|violat|infring)\w*", re.IGNORECASE)
 
 
@@ -39,6 +46,12 @@ def amounts(text: str) -> set[Decimal]:
         raw = next(group for group in match.groups() if group)
         found.add(Decimal(raw.replace(",", ".")))
     return found
+
+
+def counts(text: str) -> list[int]:
+    """The numbers of problems a sentence states, such as 2 in "There are 2 possible problems"."""
+    found = COUNT.findall(text)
+    return [int(n) if n.isdigit() else NUMBER_WORDS.index(n.lower()) + 1 for n in found]
 
 
 def known_numbers(*results: CheckResult) -> set[Decimal]:
@@ -95,6 +108,12 @@ def check_draft(
 
     for amount in sorted(amounts(draft.summary) - known_numbers(*results)):
         feedback.append(f"The summary states {amount}, a number no check gave.")
+    for count in dict.fromkeys(counts(draft.summary)):
+        if count != len(problems):
+            feedback.append(
+                f"The summary gives {count} as the number of possible problems; the checks "
+                f"found {len(problems)}."
+            )
 
     texts = [draft.summary] + [f"{f.explanation} {f.suggested_fix}" for f in draft.findings]
     for word in dict.fromkeys(m.group() for text in texts for m in VERDICT.finditer(text)):

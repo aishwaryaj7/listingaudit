@@ -5,7 +5,7 @@ from decimal import Decimal
 import pytest
 
 from listingaudit.agent.report import FindingDraft, ReportDraft
-from listingaudit.agent.selfcheck import amounts, check_draft
+from listingaudit.agent.selfcheck import amounts, check_draft, counts
 from listingaudit.checks.results import Finding, ok, problem
 from listingaudit.market.rules import Rule
 
@@ -95,6 +95,14 @@ def test_numbers_the_model_works_out_itself_are_refused():
     ]
     feedback = check_draft(draft(finding(), summary="A badge 17% too high."), RESULTS, PASSAGES)
     assert feedback == ["The summary states 17, a number no check gave."]
+
+
+def test_the_summary_gives_the_number_of_problems_the_checks_found():
+    wrong = draft(finding(), summary="There are 2 possible problems; the worst is the badge.")
+    assert check_draft(wrong, RESULTS, PASSAGES) == [
+        "The summary gives 2 as the number of possible problems; the checks found 1."
+    ]
+    assert counts("One possible problem, not three issues; 2 problems; no problems") == [1, 3, 2]
 
 
 def test_a_draft_never_calls_the_listing_illegal():
