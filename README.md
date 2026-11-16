@@ -6,8 +6,9 @@ information (GPSR), unit prices, textile fibre labels, energy labels, and photos
 match the description. It writes an audit report with evidence, and a human reviewer
 approves every finding.
 
-> Status: **step 6 of 10**, the toolbox: an MCP server that offers the checks and the
-> rulebook search to any AI agent. The agent itself comes in later steps.
+> Status: **step 7 of 10**, the agent: a LangGraph graph that audits a listing with the
+> toolbox. Plain code runs every check, and a language model judges the kind of product,
+> looks up the law and words the report. Human approval in a web app comes next.
 
 ## What's here so far
 
@@ -72,16 +73,27 @@ approves every finding.
   resources, and a prompt with the steps of an audit and the template for its report. The
   descriptions and argument schemas are written for the model, every tool returns a typed
   result, and the server reads listings with the agent's read-only database login.
+- **An audit agent** built with LangGraph, which talks to the toolbox over MCP. A language
+  model judges the kind of product, from a fixed list; code runs the checks the toolbox
+  names; the model searches the rulebook for the law behind each possible problem (tool
+  calling, at most three rounds), then words the findings and fixes as structured output.
+  A self-check in plain code tests every draft: one finding for each problem, quotes only
+  from passages the search returned, only the prices and percentages the checks worked
+  out, and no legal verdicts. A failed draft goes back with the feedback, and then to a
+  larger model if one is set up; a draft that never passes is left out, and the report
+  keeps to the checks' own words. Seller text reaches the model only as data, and no note
+  in a listing can take a problem out of the report.
 - Notebooks exploring the data: `notebooks/01_explore_abo.ipynb`,
   `notebooks/02_explore_market.ipynb`, `notebooks/03_explore_rulebook.ipynb`,
-  `notebooks/04_explore_checks.ipynb`, `notebooks/05_explore_photos.ipynb` and
-  `notebooks/06_explore_toolbox.ipynb`.
+  `notebooks/04_explore_checks.ipynb`, `notebooks/05_explore_photos.ipynb`,
+  `notebooks/06_explore_toolbox.ipynb` and `notebooks/07_explore_agent.ipynb`.
 - Tests for the data cleaning, the marketplace generator (including a check that every
   listing breaks exactly the rules the answer key says it does), the law page parsers, the
   chunking, the checklist, the search, the checking tools (including a check that every
   fibre name in Annex I of the Textile Regulation is accepted), the photo check (with
-  stand-ins for the models, so the tests cost nothing) and the toolbox (through an MCP
-  client, the way an agent uses it).
+  stand-ins for the models, so the tests cost nothing), the toolbox (through an MCP
+  client, the way an agent uses it), and the agent and its self-check (with a scripted
+  stand-in for the language model).
 
 ## Quick start
 
@@ -130,7 +142,10 @@ uv run python -m listingaudit.photos.check P0262
 # 12. Try the toolbox in the MCP Inspector, in the browser (needs Node.js, see below)
 npx @modelcontextprotocol/inspector@2.13.0 -- uv run python -m listingaudit.toolbox.server
 
-# 13. Explore the data
+# 13. Audit a listing with the agent (needs a language model, see below)
+uv run python -m listingaudit.agent.run P0171
+
+# 14. Explore the data
 uv run jupyter lab notebooks/
 ```
 
@@ -140,10 +155,10 @@ Faker that generate it.
 
 On Windows PowerShell, use `copy .env.example .env` in step 1. Everything else is the same.
 
-### The vision model (optional)
+### The vision model on Azure OpenAI
 
-The photo check works without it: photos CLIP can't settle then go to the reviewer. To
-compare CLIP with a vision language model on Azure OpenAI:
+The photo check works without it: photos CLIP can't settle then go to the reviewer. The
+agent needs it, as its language models use the same endpoint and key. To set it up:
 
 1. In the Azure portal, create an **Azure OpenAI** resource (pricing tier Standard S0).
 2. In its Foundry portal, deploy **gpt-5-mini** with the deployment type
@@ -225,6 +240,35 @@ client's server settings, with the path to this folder:
 
 If the client can't find `uv`, give its full path, which `which uv` prints.
 
+### The agent
+
+The agent's language models use the endpoint and key of the vision model (see above),
+with gpt-5-mini by default. With the database running:
+
+```bash
+uv run python -m listingaudit.agent.run P0171 P0198 --save
+```
+
+It prints each step as it ends, then the report, the time it took, and the tokens the
+models used with their cost at the list price. With `--save`, each audit is also written
+to `data/results/agent/`.
+
+An audit is a LangGraph graph of six steps. The agent starts the toolbox and keeps one MCP
+session open for the whole audit.
+
+| Step | Done by | What it does |
+| --- | --- | --- |
+| `read_listing` | code | Reads the listing with `get_listing` |
+| `pick_rules` | model, code | The model judges the kind of product, and `rules_for_listing` names the rules |
+| `run_checks` | code | Runs `run_checks` and `check_photo`; a listing without a possible problem goes straight to review |
+| `look_up_law` | model | Asks for `search_rulebook` searches, for at most three rounds |
+| `write_report` | model, code | The model words each finding and its fix; the self-check tests the draft and sends it back with feedback |
+| `human_review` | code | Builds the report for a person to review |
+
+`AGENT_MODEL` in `.env` names the deployment of the small model. To have a larger model
+take over a draft the small one can't get past the self-check in two tries, deploy it on
+the same resource and set `AGENT_MODEL_LARGE` to its deployment name.
+
 ## Project layout
 
 ```
@@ -272,6 +316,13 @@ src/listingaudit/photos/tune.py           picks CLIP's thresholds on spare photo
 src/listingaudit/photos/evaluate.py       scores CLIP, the vision model and both
 src/listingaudit/toolbox/server.py        the MCP server: tools, resources and a prompt
 src/listingaudit/toolbox/audit_prompt.md  the steps of an audit and its report template
+src/listingaudit/agent/graph.py           the agent: a LangGraph graph of the audit steps
+src/listingaudit/agent/brain.py           the language models, and what the agent asks them
+src/listingaudit/agent/report.py          the models' answers, and the report a person reviews
+src/listingaudit/agent/selfcheck.py       tests a draft report against the tool results
+src/listingaudit/agent/toolbox.py         starts the toolbox and connects to it over MCP
+src/listingaudit/agent/scripted.py        a scripted stand-in for the model, for tests and notebooks
+src/listingaudit/agent/run.py             audits listings from the command line
 notebooks/                                data exploration
 tests/                                    tests
 data/                                     downloaded files (not in git)
