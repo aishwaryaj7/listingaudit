@@ -20,11 +20,11 @@ from listingaudit.checks.results import (
     ok,
     problem,
 )
-from listingaudit.config import settings
 from listingaudit.market.models import Offer
 from listingaudit.market.rules import Rule
 from listingaudit.photos.clip import Clip, get_clip
 from listingaudit.photos.colours import family_of, is_near, noun
+from listingaudit.photos.store import photo_path
 from listingaudit.photos.vision import Vision, VisionReply
 
 RULE = Rule.PHOTO_MATCHES_TEXT
@@ -82,7 +82,7 @@ def check_photo(
             else f"The colour '{offer.color}' isn't one clear colour"
         )
         return not_applicable(RULE, f"{reason}, so there is nothing to compare the photo with.")
-    path = settings.data_dir / offer.image_file
+    path = photo_path(offer.image_file)
     if not path.exists():
         return cannot_check(RULE, f"The photo {offer.image_file} is missing.")
 

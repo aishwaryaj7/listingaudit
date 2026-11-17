@@ -30,6 +30,7 @@ from listingaudit.data.categories import RULE_GROUPS
 from listingaudit.eval.records import article_key, bare_article
 from listingaudit.market.models import Offer, PricePoint
 from listingaudit.market.rules import Rule
+from listingaudit.photos.store import photo_path
 from listingaudit.rulebook.chunk import citation
 from listingaudit.rulebook.sources import SOURCES, SOURCES_BY_ID
 
@@ -172,7 +173,7 @@ class OnePrompt:
     async def audit(
         self, offer: Offer, history: list[PricePoint], config: dict[str, Any] | None = None
     ) -> OnePromptAnswer:
-        photo = settings.data_dir / offer.image_file
+        photo = photo_path(offer.image_file)
         messages = one_prompt_messages(offer, history, photo)
         return await structured(self.model, OnePromptAnswer).ainvoke(messages, config=config)
 

@@ -5,6 +5,8 @@ description = "An AI agent that audits online shop listings against EU consumer 
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
+    "azure-identity>=1.25,<2",
+    "azure-storage-blob>=12.27,<13",
     "beautifulsoup4>=4.12",
     "faker>=40",
     "fastapi>=0.163.1,<1",

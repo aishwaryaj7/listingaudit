@@ -34,6 +34,7 @@ from listingaudit.config import settings
 from listingaudit.db import connect_as_agent
 from listingaudit.market.models import Offer, PricePoint
 from listingaudit.market.rules import Rule
+from listingaudit.photos.store import photo_path
 from listingaudit.rulebook.checklist import load_checklist
 from listingaudit.rulebook.sources import SOURCES
 
@@ -296,7 +297,7 @@ def laws() -> str:
 def listing_photo(offer_id: str) -> bytes:
     """The main photo of a listing, such as listing://P0042/photo."""
     offer, _ = load_listing(offer_id)
-    return (settings.data_dir / offer.image_file).read_bytes()
+    return photo_path(offer.image_file).read_bytes()
 
 
 # --- Prompts -------------------------------------------------------------------
