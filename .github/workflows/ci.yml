@@ -33,6 +33,12 @@ jobs:
       - name: The lockfile matches pyproject.toml
         run: uv lock --check
 
+      - name: Start Azurite, the Blob Storage emulator, for the photo store test
+        run: >-
+          docker run --detach --publish 10000:10000
+          mcr.microsoft.com/azure-storage/azurite:3.37.0
+          azurite-blob --blobHost 0.0.0.0 --skipApiVersionCheck
+
       - name: Install
         run: uv sync --frozen
 
@@ -53,3 +59,23 @@ jobs:
         run: |
           echo "## Results on the exam listings" >> "$GITHUB_STEP_SUMMARY"
           uv run --frozen python -m listingaudit.eval.grade --check >> "$GITHUB_STEP_SUMMARY"
+
+  bicep:
+    name: Check the Azure deployment
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Build main.bicep
+        run: az bicep build --file deploy/main.bicep --stdout > /dev/null
+
+      - name: Build main.bicepparam, with stand-ins for what deploy.sh sets
+        env:
+          DEPLOYER_ID: 00000000-0000-0000-0000-000000000000
+          DEPLOYER_IP: 192.0.2.1
+          AZURE_POSTGRES_PASSWORD: stand-in
+          AZURE_AGENT_DB_PASSWORD: stand-in
+          AZURE_SCREEN_PASSWORD: stand-in
+          VISION_API_KEY: stand-in
+        run: az bicep build-params --file deploy/main.bicepparam --stdout > /dev/null
