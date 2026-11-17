@@ -6,10 +6,11 @@ from decimal import Decimal
 
 import pytest
 from PIL import Image
+from pydantic import SecretStr
 from streamlit.testing.v1 import AppTest
 
 from listingaudit.agent.report import Note, Problem, Report, Review, seller_message
-from listingaudit.config import PROJECT_ROOT
+from listingaudit.config import PROJECT_ROOT, settings
 from listingaudit.market.rules import Rule
 from listingaudit.review.client import ApiError
 
@@ -217,3 +218,25 @@ def test_an_audit_started_on_the_screen_shows_its_steps_and_opens(fake):
     assert app.status[0].label == "P0171 is ready for review, after 9.5 s"
     assert "read_listing (0.1 s): Pillow" in [text.value for text in app.text]
     assert app.subheader[0].value == "P0171, waiting for review"
+
+
+def sign_in(app: AppTest, password: str) -> AppTest:
+    app.text_input[0].input(password)
+    [button] = [button for button in app.button if button.label == "Sign in"]
+    return button.click().run()
+
+
+def test_with_a_password_the_screen_asks_for_it_before_anything_else(fake, monkeypatch):
+    monkeypatch.setattr(settings, "screen_password", SecretStr("correct horse battery"))
+    app = screen(fake)
+    assert not app.exception
+    assert [box.label for box in app.text_input] == ["Password"]
+
+    app = sign_in(app, "correct horse")
+    assert [error.value for error in app.error] == ["That password isn't right."]
+    assert [box.label for box in app.text_input] == ["Password"]
+
+    app = sign_in(app, "correct horse battery")
+    assert not app.exception
+    assert "Your name" in [box.label for box in app.text_input]
+    assert "Password" not in [box.label for box in app.text_input]

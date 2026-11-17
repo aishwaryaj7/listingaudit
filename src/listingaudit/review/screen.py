@@ -4,12 +4,14 @@
 
 The screen is a client of the review API, which has to be running too (API_URL, by
 default http://127.0.0.1:8000). Saving a decision saves the review and a draft message
-to the seller. Nothing on this screen contacts a seller.
+to the seller. Nothing on this screen contacts a seller. With SCREEN_PASSWORD set, as
+in the cloud, the screen asks for it first.
 
 Text written by sellers, the model or reviewers is shown with st.text, never as
 Markdown, so it appears exactly as written.
 """
 
+import hmac
 from datetime import datetime
 from typing import Any
 
@@ -26,6 +28,26 @@ PRICE_KINDS = {"previous_price": "the seller's earlier price", "rrp": "recommend
 st.set_page_config(
     page_title="ListingAudit review", page_icon=":material/fact_check:", layout="wide"
 )
+
+
+def signed_in() -> bool:
+    """Ask for the screen's password, if it has one, until it is given."""
+    if settings.screen_password is None or st.session_state.get("signed_in"):
+        return True
+    st.title("ListingAudit")
+    with st.form("sign_in"):
+        password = st.text_input("Password", type="password")
+        if st.form_submit_button("Sign in"):
+            expected = settings.screen_password.get_secret_value()
+            if hmac.compare_digest(password.encode(), expected.encode()):
+                st.session_state.signed_in = True
+                st.rerun()
+            st.error("That password isn't right.")
+    return False
+
+
+if not signed_in():
+    st.stop()
 
 if "api" not in st.session_state:
     st.session_state.api = ReviewApi(settings.api_url)

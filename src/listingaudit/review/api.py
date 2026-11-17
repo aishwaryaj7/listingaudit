@@ -65,6 +65,12 @@ async def find_listing(offer_id: OfferId, service: Service) -> dict[str, Any]:
 Listing = Annotated[dict[str, Any], Depends(find_listing)]
 
 
+@app.get("/health")
+async def health() -> dict[str, str]:
+    """For the probes of a container platform: the API has started and serves."""
+    return {"status": "ok"}
+
+
 @app.get("/listings/{offer_id}")
 async def read_listing(listing: Listing) -> dict[str, Any]:
     """A listing as shoppers see it."""

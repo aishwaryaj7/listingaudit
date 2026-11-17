@@ -118,6 +118,7 @@ async def test_the_api_serves_listings_and_their_photos(client):
     assert photo.content.startswith(b"\xff\xd8")  # every JPEG file starts so
     assert (await client.get("/listings/P9999")).json() == {"detail": "There is no listing P9999."}
     assert (await client.get("/listings/42")).status_code == 422
+    assert (await client.get("/health")).json() == {"status": "ok"}
 
 
 @pytest.mark.anyio
