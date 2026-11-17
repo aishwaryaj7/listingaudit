@@ -1,0 +1,9 @@
+# Only what the image needs; .env and the rest of data/ stay out
+*
+!pyproject.toml
+!uv.lock
+!README.md
+!src/
+!db/
+!data/models/
+**/__pycache__

@@ -16,5 +16,41 @@ services:
       timeout: 3s
       retries: 10
 
+  # The review API and the review screen from the Dockerfile, the way they run in Azure:
+  #   docker compose --profile app up --build
+  api:
+    profiles: [ app ]
+    build: .
+    image: listingaudit
+    platform: linux/amd64
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      POSTGRES_HOST: db
+      POSTGRES_PORT: "5432"
+    volumes:
+      - ./data/images:/app/data/images:ro
+    ports:
+      - "127.0.0.1:8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+
+  screen:
+    profiles: [ app ]
+    image: listingaudit
+    platform: linux/amd64
+    command: [ "streamlit", "run", "src/listingaudit/review/screen.py", "--server.address", "0.0.0.0" ]
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      API_URL: http://api:8000
+    ports:
+      - "127.0.0.1:8501:8501"
+    depends_on:
+      - api
+
 volumes:
   pgdata:
