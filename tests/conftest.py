@@ -129,8 +129,11 @@ def make_offer():
 
 
 @pytest.fixture(autouse=True)
-def no_tracing(monkeypatch):
-    """No test sends traces to Langfuse, whatever keys .env holds."""
+def local_settings(monkeypatch):
+    """Whatever .env holds: no tracing, no photos from Azure and no screen password."""
     monkeypatch.setattr(settings, "langfuse_public_key", None)
     monkeypatch.setattr(settings, "langfuse_secret_key", None)
     tracing.langfuse.cache_clear()
+    monkeypatch.setattr(settings, "photos_account_url", None)
+    monkeypatch.setattr(settings, "photos_connection_string", None)
+    monkeypatch.setattr(settings, "screen_password", None)

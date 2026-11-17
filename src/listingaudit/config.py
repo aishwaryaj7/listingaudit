@@ -48,6 +48,15 @@ class Settings(BaseSettings):
     review_schema: str = Field(default="review", pattern=r"^[a-z_][a-z0-9_]*$")
     # The review API, where the review screen finds it
     api_url: str = "http://127.0.0.1:8000"
+    # A password for the review screen; without one, the screen asks for none
+    screen_password: SecretStr | None = None
+
+    # Listing photos in Azure Blob Storage, for a deployment without data/images: the
+    # account's blob URL (the app signs in with its managed identity, or az login), or a
+    # connection string with a key (Azurite). Each photo is kept in data/ after first use.
+    photos_account_url: str | None = None
+    photos_connection_string: SecretStr | None = None
+    photos_container: str = "photos"
 
     # Langfuse, which traces each run of the agent. Without keys, nothing is traced.
     langfuse_public_key: str | None = None
