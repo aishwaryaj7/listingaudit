@@ -16,6 +16,7 @@ from typing import Any
 
 from langchain_core.callbacks import UsageMetadataCallbackHandler
 
+from listingaudit import tracing
 from listingaudit.agent.brain import Brain
 from listingaudit.agent.graph import build_graph, step_line
 from listingaudit.agent.report import Report, render
@@ -38,12 +39,13 @@ def cost(usage: dict[str, Any]) -> float | None:
 
 
 async def audit(graph: Any, offer_id: str, save: bool) -> None:
-    usage = UsageMetadataCallbackHandler()
+    usage, tracer = UsageMetadataCallbackHandler(), tracing.tracer()
+    config = tracing.run_config(usage, tracer, name="audit", tags=["command line"])
     started = last = time.perf_counter()
     state: dict[str, Any] = {"offer_id": offer_id}
     # "updates" gives what each step changed, "values" the whole state after it
     modes = ["updates", "values"]
-    async for mode, chunk in graph.astream(state, {"callbacks": [usage]}, stream_mode=modes):
+    async for mode, chunk in graph.astream(state, config, stream_mode=modes):
         if mode == "values":
             state = chunk
             continue
@@ -65,6 +67,8 @@ async def audit(graph: Any, offer_id: str, save: bool) -> None:
         for model, data in tokens.items()
     )
     print(f"{seconds:.0f} s; tokens: {used or 'none'}" + (f"; about ${price:.4f}" if price else ""))
+    if trace := tracing.trace_id(tracer):
+        print(f"Trace: {tracing.trace_url(trace) or trace}", file=sys.stderr)
 
     if save:
         folder = settings.data_dir / "results" / "agent"
@@ -78,6 +82,7 @@ async def audit(graph: Any, offer_id: str, save: bool) -> None:
             "large": state.get("large", False),
             "seconds": round(seconds, 1),
             "tokens": tokens,
+            "trace_id": tracing.trace_id(tracer),
         }
         path = folder / f"{offer_id}.json"
         path.write_text(json.dumps(record, ensure_ascii=False, indent=2), encoding="utf-8")
@@ -94,6 +99,7 @@ async def main_async(offer_ids: list[str], save: bool) -> None:
                 await audit(graph, offer_id, save)
             except ToolError as error:
                 print(f"  {error}", file=sys.stderr)
+    tracing.flush()
 
 
 def main() -> None:

@@ -4,6 +4,8 @@ from decimal import Decimal
 
 import pytest
 
+from listingaudit import tracing
+from listingaudit.config import settings
 from listingaudit.market.catalogue import PackSize, Photo, Product, colour_family
 from listingaudit.market.models import Offer
 
@@ -124,3 +126,11 @@ def make_offer():
         return Offer(**(fields | changes))
 
     return make
+
+
+@pytest.fixture(autouse=True)
+def no_tracing(monkeypatch):
+    """No test sends traces to Langfuse, whatever keys .env holds."""
+    monkeypatch.setattr(settings, "langfuse_public_key", None)
+    monkeypatch.setattr(settings, "langfuse_secret_key", None)
+    tracing.langfuse.cache_clear()

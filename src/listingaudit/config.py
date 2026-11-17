@@ -41,11 +41,19 @@ class Settings(BaseSettings):
     # without one, the small model does everything.
     agent_model: str = "gpt-5-mini"
     agent_model_large: str | None = None
+    # The model that grades the reports' clarity and fairness; the agent's model by default
+    judge_model: str | None = None
 
     # The schema that holds the audit log and the checkpoints of audits waiting for review
     review_schema: str = Field(default="review", pattern=r"^[a-z_][a-z0-9_]*$")
     # The review API, where the review screen finds it
     api_url: str = "http://127.0.0.1:8000"
+
+    # Langfuse, which traces each run of the agent. Without keys, nothing is traced.
+    langfuse_public_key: str | None = None
+    langfuse_secret_key: SecretStr | None = None
+    langfuse_base_url: str = "https://cloud.langfuse.com"
+    langfuse_environment: str = "local"
 
     @property
     def database_url(self) -> str:

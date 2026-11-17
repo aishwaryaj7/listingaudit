@@ -11,6 +11,7 @@ dependencies = [
     "httpx>=0.27",
     "langchain-mcp-adapters>=0.3.2,<0.4",
     "langchain-openai>=1.8,<2",
+    "langfuse>=5.2,<6",
     "langgraph>=1.2.22,<2",
     "langgraph-checkpoint-postgres>=3.2.1,<4",
     "lxml>=5.2",
@@ -59,3 +60,5 @@ select = ["E", "F", "I", "B", "UP"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+# DeepEval brings pytest plugins of its own when it is layered on (see eval/judge.py)
+addopts = "-p no:deepeval -p no:asyncio"

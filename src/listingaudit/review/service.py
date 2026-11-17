@@ -23,6 +23,7 @@ from psycopg.errors import UniqueViolation
 from psycopg_pool import AsyncConnectionPool
 from pydantic import BaseModel, Field
 
+from listingaudit import tracing
 from listingaudit.agent.brain import Brain
 from listingaudit.agent.graph import build_graph, step_line
 from listingaudit.agent.report import Report, Review, SellerMessage, counted
@@ -149,8 +150,9 @@ class ReviewService:
     async def audit(self, offer_id: str) -> AsyncIterator[Progress]:
         """Audit a listing, giving each step as it ends, until the report waits for review."""
         audit_id = uuid4()
-        usage = UsageMetadataCallbackHandler()
-        config = thread(audit_id) | {"callbacks": [usage]}
+        usage, tracer = UsageMetadataCallbackHandler(), tracing.tracer()
+        traced = tracing.run_config(usage, tracer, name="audit", session=str(audit_id))
+        config = thread(audit_id) | traced
         started = time.perf_counter()
 
         def progress(step: str, detail: str) -> Progress:
@@ -181,6 +183,7 @@ class ReviewService:
                 model: {key: data[key] for key in ("input_tokens", "output_tokens")}
                 for model, data in usage.usage_metadata.items()
             },
+            "trace_id": tracing.trace_id(tracer),
         }
         await self.log.add(audit_id, offer_id, "reported", record)
         yield progress("waiting", state["report"]["summary"])
@@ -201,7 +204,10 @@ class ReviewService:
         if audit.status == "reviewed":
             raise AlreadyReviewed(f"Audit {audit_id} has been reviewed already.")
         resume = Command(resume=review.model_dump(mode="json"))
-        state = await self.graph.ainvoke(resume, thread(audit_id), durability="exit")
+        traced = tracing.run_config(
+            tracing.tracer(), name="review", session=str(audit_id), user=review.reviewer
+        )
+        state = await self.graph.ainvoke(resume, thread(audit_id) | traced, durability="exit")
         if "__interrupt__" in state:
             raise ReviewIncomplete(state["__interrupt__"][0].value["errors"])
         record = {"review": state["review"], "message": state["message"]}
