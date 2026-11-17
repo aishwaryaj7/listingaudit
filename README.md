@@ -1,14 +1,22 @@
 # ListingAudit
 
+[![CI](../../actions/workflows/ci.yml/badge.svg)](../../actions/workflows/ci.yml)
+
 ListingAudit is an AI agent that audits online shop listings against EU consumer and
 product-safety rules: honest discounts (the 30-day price rule), manufacturer and safety
 information (GPSR), unit prices, textile fibre labels, energy labels, and photos that
 match the description. It writes an audit report with evidence, and a human reviewer
 approves every finding.
 
-> Status: **step 8 of 10**, human review: the agent pauses after its report until a
-> person approves or rejects each finding, on a review screen that shows the listing and
-> its photo beside the report. Evaluation and monitoring come next.
+> Status: **step 9 of 10**, evaluation and tracing: the agent and two simpler systems are
+> graded on the 400 exam listings against the answer key, CI checks the results on every
+> push, and every agent run can be traced with Langfuse. Deployment comes next.
+
+## Results
+
+<!-- results:start -->
+The results table appears here once the evaluation has run (see "The evaluation" below).
+<!-- results:end -->
 
 ## What's here so far
 
@@ -90,19 +98,37 @@ approves every finding.
   approves or rejects every finding and can reword its fix. The approved findings make a
   draft message to the seller, which is saved and never sent. Every report and decision
   goes to an audit log that only takes new rows.
+- **An evaluation on the 400 exam listings**, which nothing was tuned on. The agent is
+  compared with two simpler systems: rules in plain code (the category a listing is filed
+  under picks its rules; no AI, no photo check) and one big prompt (the listing, its price
+  history, its photo and the rules in one request to the model; no tools). A grader
+  scores each system against the answer key: problems caught by kind and difficulty,
+  false alarms on clean and on tricky listings, the right rules, the right law and
+  article, prices and percentages that no check worked out, suggested fixes that pass the
+  check once applied, listings with notes that tell the reviewer to approve them, the
+  same findings across five runs, and the cost and time per 1,000 listings.
+- **An AI judge**: DeepEval's G-Eval grades each report's clarity and fairness from 1 to
+  5, and a person grades 30 of the reports too, to see how often the judge agrees.
+- **Tracing with Langfuse**: each audit becomes one trace with its steps, prompts, tool
+  calls, tokens and time, and each saved audit keeps its trace id.
+- **CI on GitHub Actions**: on every push, the lint, the tests, and the grader on the
+  committed results. The build fails on a made-up number, a legal verdict in a report, or
+  a listing the agent didn't audit.
 - Notebooks exploring the data: `notebooks/01_explore_abo.ipynb`,
   `notebooks/02_explore_market.ipynb`, `notebooks/03_explore_rulebook.ipynb`,
   `notebooks/04_explore_checks.ipynb`, `notebooks/05_explore_photos.ipynb`,
-  `notebooks/06_explore_toolbox.ipynb`, `notebooks/07_explore_agent.ipynb` and
-  `notebooks/08_explore_review.ipynb`.
+  `notebooks/06_explore_toolbox.ipynb`, `notebooks/07_explore_agent.ipynb`,
+  `notebooks/08_explore_review.ipynb` and `notebooks/09_explore_eval.ipynb`.
 - Tests for the data cleaning, the marketplace generator (including a check that every
   listing breaks exactly the rules the answer key says it does), the law page parsers, the
   chunking, the checklist, the search, the checking tools (including a check that every
   fibre name in Annex I of the Textile Regulation is accepted), the photo check (with
   stand-ins for the models, so the tests cost nothing), the toolbox (through an MCP
   client, the way an agent uses it), the agent and its self-check (with a scripted
-  stand-in for the language model), and the review: the pause and the restart, the audit
-  log, the API (over HTTP, in memory) and the screen (with Streamlit's test harness).
+  stand-in for the language model), the review (the pause and the restart, the audit
+  log, the API over HTTP in memory, and the screen with Streamlit's test harness), the
+  evaluation (the runner, the two simpler systems, the grader, the fix check and the
+  judge, with scripted models) and the tracing (into memory instead of Langfuse).
 
 ## Quick start
 
@@ -159,7 +185,10 @@ uv run python -m listingaudit.agent.run P0171
 uv run uvicorn listingaudit.review.api:app
 uv run streamlit run src/listingaudit/review/screen.py
 
-# 15. Explore the data
+# 15. Grade the saved evaluation (needs neither the database nor a model)
+uv run python -m listingaudit.eval.grade
+
+# 16. Explore the data
 uv run jupyter lab notebooks/
 ```
 
@@ -324,6 +353,79 @@ the database refuses to change or delete its rows. `REVIEW_SCHEMA` in `.env` mov
 log and the checkpoints to another schema, and `API_URL` tells the screen where the API
 runs.
 
+### The evaluation
+
+The evaluation runs three systems on the 400 exam listings and grades them against the
+answer key:
+
+| System | What it is |
+| --- | --- |
+| `agent` | The audit agent above, without the human review |
+| `rules_only` | No AI: the category a listing is filed under picks its rules, code checks them, and the photo is left to a person |
+| `one_prompt` | One request to the language model with the whole listing, its price history, its photo and the rules in plain words; no tools, no code checks, no rulebook |
+
+The runs save every audit under `results/exam/`, which is committed. The agent and
+one_prompt call the paid model; with the database running:
+
+```bash
+uv run python -m listingaudit.eval.run agent
+uv run python -m listingaudit.eval.run agent --repeats 5 --sample 10
+uv run python -m listingaudit.eval.run one_prompt
+uv run python -m listingaudit.eval.run rules_only
+uv run python -m listingaudit.eval.fixes
+uv run --with "deepeval==4.3.4" python -m listingaudit.eval.judge
+uv run python -m listingaudit.eval.judge --grade
+uv run python -m listingaudit.eval.grade --readme
+```
+
+A run carries on where it stopped, and runs failed audits again. `--repeats 5 --sample 10`
+audits 10 of the listings four more times, to see whether the findings stay the same.
+`eval.fixes` has the model apply each suggested fix to its listing, taking every number
+from the fix's own words, and runs the rule's check again. `eval.judge` has DeepEval's
+G-Eval grade each report's clarity and fairness from 1 to 5 (`JUDGE_MODEL` in `.env` sets
+the judge's deployment, the agent's by default), and `--grade` asks you for your own
+grades on 30 of the agent's reports, to see how often the judge agrees with a person.
+`--readme` writes the table into the Results section above.
+
+DeepEval isn't one of the project's dependencies: it needs click below 8.4, which would
+hold huggingface-hub and transformers back for the whole app. `uv run --with` adds it in a
+layer of its own, for that one command.
+
+The grader needs neither the database nor a model, so once the results are committed,
+CI runs it on every push. With `--check` it fails when
+
+- the agent didn't audit every exam listing,
+- a report states a price or percentage that no check worked out and the listing doesn't
+  show,
+- a report calls a listing illegal, unlawful, a violation or an infringement, or
+- the table in this README is out of date.
+
+The targets in the table are reported, not enforced: the runs aren't repeated in CI,
+where they would cost money on every push.
+
+### Tracing with Langfuse
+
+With a [Langfuse](https://langfuse.com) project's keys in `.env`, every run of the agent
+becomes a trace: each step of the graph, each prompt and answer, each tool call, the
+tokens and the time. Langfuse Cloud has a free plan:
+
+1. Sign up at https://cloud.langfuse.com (the EU region) and create a project.
+2. In the project's settings, create an API key.
+3. Add the key pair to `.env`:
+
+   ```
+   LANGFUSE_PUBLIC_KEY=pk-lf-...
+   LANGFUSE_SECRET_KEY=sk-lf-...
+   ```
+
+The command line prints a link to each audit's trace. The review service files an audit
+and its review under one session, named by the audit's id, with the reviewer as the user,
+and the evaluation tags its runs with the system and the split and keeps each trace id in
+the run's record. Without keys nothing is traced or sent, and the tests never trace.
+
+A trace holds the listing and the report. The listings here are made up; for real ones,
+check where the traces are kept, or run Langfuse yourself and set `LANGFUSE_BASE_URL`.
+
 ## Project layout
 
 ```
@@ -384,8 +486,17 @@ src/listingaudit/review/service.py        audits that wait for review, with the 
 src/listingaudit/review/api.py            the review API (FastAPI)
 src/listingaudit/review/client.py         a client of the API, for the screen
 src/listingaudit/review/screen.py         the review screen (Streamlit)
+src/listingaudit/tracing.py               tracing with Langfuse
+src/listingaudit/eval/records.py          what an evaluation keeps: the audits and the answer key
+src/listingaudit/eval/baselines.py        the two simpler systems: rules only, and one prompt
+src/listingaudit/eval/run.py              runs a system on the listings of a split
+src/listingaudit/eval/grade.py            grades the runs against the answer key, and the gates
+src/listingaudit/eval/fixes.py            applies each suggested fix and checks again
+src/listingaudit/eval/judge.py            the AI judge, and a person's grades
+results/exam/                             the exam listings, their answer key, and every audit
 notebooks/                                data exploration
 tests/                                    tests
+.github/workflows/ci.yml                  lint, tests and grading on every push
 data/                                     downloaded files (not in git)
 ```
 

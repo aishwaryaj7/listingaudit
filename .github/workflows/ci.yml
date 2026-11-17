@@ -1,0 +1,55 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # Tests never download models; the ones that need models or the database skip
+  HF_HUB_OFFLINE: "1"
+  DEEPEVAL_TELEMETRY_OPT_OUT: "1"
+
+jobs:
+  check:
+    name: Lint, test and grade
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: astral-sh/setup-uv@v7
+        with:
+          version: "0.11.32"
+
+      - name: The lockfile matches pyproject.toml
+        run: uv lock --check
+
+      - name: Install
+        run: uv sync --frozen
+
+      - name: Lint
+        run: |
+          uv run --frozen ruff check .
+          uv run --frozen ruff format --check .
+
+      - name: Tests
+        run: uv run --frozen pytest
+
+      - name: Tests of the AI judge, with DeepEval in a layer of its own
+        run: uv run --frozen --with "deepeval==4.3.4" pytest tests/test_eval_judge.py
+
+      # Skipped until the evaluation's results are committed
+      - name: Grade the saved results and check the gates
+        if: hashFiles('results/exam/answer_key.json') != ''
+        run: |
+          echo "## Results on the exam listings" >> "$GITHUB_STEP_SUMMARY"
+          uv run --frozen python -m listingaudit.eval.grade --check >> "$GITHUB_STEP_SUMMARY"
