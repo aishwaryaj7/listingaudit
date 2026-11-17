@@ -8,9 +8,9 @@ information (GPSR), unit prices, textile fibre labels, energy labels, and photos
 match the description. It writes an audit report with evidence, and a human reviewer
 approves every finding.
 
-> Status: **step 9 of 10**, evaluation and tracing: the agent and two simpler systems are
-> graded on the 400 exam listings against the answer key, CI checks the results on every
-> push, and every agent run can be traced with Langfuse. Deployment comes next.
+> Status: **complete**. All ten steps are built: the data, the rulebook, the checking
+> tools, the photo check, the MCP toolbox, the agent, human review, the evaluation with
+> tracing and CI, and a Docker image that deploys to Azure Container Apps with Bicep.
 
 ## Results
 
@@ -18,7 +18,30 @@ approves every finding.
 The results table appears here once the evaluation has run (see "The evaluation" below).
 <!-- results:end -->
 
-## What's here so far
+## How it works
+
+```mermaid
+flowchart LR
+    person([Reviewer]) --> screen["Review screen<br/>Streamlit"]
+    screen -- "HTTP, server-sent events" --> api["Review API<br/>FastAPI"]
+    api --> agent["Audit agent<br/>LangGraph"]
+    agent -- "MCP over stdio" --> toolbox["Toolbox<br/>MCP server"]
+    agent --> llm["gpt-5-mini<br/>Azure OpenAI"]
+    toolbox --> checks["Checks in plain code"]
+    toolbox --> clip["Photo check<br/>CLIP"]
+    toolbox --> search["Rulebook search<br/>e5 and pgvector"]
+    toolbox -- "read-only login" --> market[("Postgres<br/>marketplace, rulebook")]
+    api --> review[("Postgres<br/>paused audits, audit log")]
+    agent -.-> langfuse["Langfuse<br/>traces"]
+```
+
+A person starts an audit on the review screen. The API runs the agent, which reads the
+listing and runs the checks through the toolbox, and asks the language model only what
+code can't settle: the kind of product, the law behind each possible problem, and the
+wording of the findings. Code checks the model's draft before anyone sees it. The report
+then waits in Postgres until a person approves or rejects each finding.
+
+## What's here
 
 - A Postgres database (in Docker) holding the full
   [Amazon Berkeley Objects](https://amazon-berkeley-objects.s3.amazonaws.com/index.html)
@@ -111,9 +134,18 @@ The results table appears here once the evaluation has run (see "The evaluation"
   5, and a person grades 30 of the reports too, to see how often the judge agrees.
 - **Tracing with Langfuse**: each audit becomes one trace with its steps, prompts, tool
   calls, tokens and time, and each saved audit keeps its trace id.
-- **CI on GitHub Actions**: on every push, the lint, the tests, and the grader on the
-  committed results. The build fails on a made-up number, a legal verdict in a report, or
-  a listing the agent didn't audit.
+- **CI on GitHub Actions**: on every push, the lint, the tests, the grader on the
+  committed results, and a build of the Azure deployment's Bicep files. The build fails
+  on a made-up number, a legal verdict in a report, or a listing the agent didn't audit.
+- **A Docker image** for the review API (which starts the toolbox) and the review screen.
+  Every package comes from `uv.lock` except PyTorch, which comes in its CPU build,
+  without the 4 GB of CUDA libraries a CPU never uses. The image carries the embedding
+  model and CLIP, so a new container starts without downloading anything.
+- **A deployment to Azure**, described in Bicep: Container Apps for the API (reachable
+  only inside its environment) and the screen (public, behind a password), PostgreSQL
+  with pgvector, Blob Storage for the photos, Key Vault for the secrets, and a container
+  registry. The apps sign in to the registry, Key Vault and Blob Storage with a managed
+  identity, so no key is written into the code or the settings.
 - Notebooks exploring the data: `notebooks/01_explore_abo.ipynb`,
   `notebooks/02_explore_market.ipynb`, `notebooks/03_explore_rulebook.ipynb`,
   `notebooks/04_explore_checks.ipynb`, `notebooks/05_explore_photos.ipynb`,
@@ -126,9 +158,11 @@ The results table appears here once the evaluation has run (see "The evaluation"
   stand-ins for the models, so the tests cost nothing), the toolbox (through an MCP
   client, the way an agent uses it), the agent and its self-check (with a scripted
   stand-in for the language model), the review (the pause and the restart, the audit
-  log, the API over HTTP in memory, and the screen with Streamlit's test harness), the
-  evaluation (the runner, the two simpler systems, the grader, the fix check and the
-  judge, with scripted models) and the tracing (into memory instead of Langfuse).
+  log, the API over HTTP in memory, and the screen and its password with Streamlit's test
+  harness), the evaluation (the runner, the two simpler systems, the grader, the fix check
+  and the judge, with scripted models), the tracing (into memory instead of Langfuse) and
+  the photo store (with a stand-in for Blob Storage, and with Azurite, Azure's storage
+  emulator, when it runs).
 
 ## Quick start
 
@@ -190,6 +224,9 @@ uv run python -m listingaudit.eval.grade
 
 # 16. Explore the data
 uv run jupyter lab notebooks/
+
+# 17. Or run the review API and the review screen in Docker (see below)
+docker compose --profile app up --build
 ```
 
 The marketplace build always gives the same data: the random seeds and the marketplace's
@@ -328,7 +365,8 @@ uv run uvicorn listingaudit.review.api:app
 uv run streamlit run src/listingaudit/review/screen.py
 ```
 
-The screen opens at http://localhost:8501. Write your name, audit a listing such as
+The screen opens at http://localhost:8501 (with `SCREEN_PASSWORD` in `.env`, it asks for
+that password first, as it does in Azure). Write your name, audit a listing such as
 P0171, and watch its steps arrive. The report waits in the list on the left: approve or
 reject each finding (a rejection needs a reason), reword the fix if you like, and save.
 The approved findings become a draft message to the seller, shown with a copy button.
@@ -426,6 +464,104 @@ the run's record. Without keys nothing is traced or sent, and the tests never tr
 A trace holds the listing and the report. The listings here are made up; for real ones,
 check where the traces are kept, or run Langfuse yourself and set `LANGFUSE_BASE_URL`.
 
+### Running in Docker
+
+The `Dockerfile` builds one image for the review API and the review screen. Build it
+after the quick start, since it takes the models from `data/models`. With the database
+running:
+
+```bash
+docker compose --profile app up --build
+```
+
+The screen opens at http://localhost:8501 and the API at http://localhost:8000, as
+before. The containers read `.env`, reach the database by its service name, and read the
+photos from `data/images`. The image is built for linux/amd64, the platform Azure runs; on
+a Mac with Apple silicon, Docker Desktop emulates it. The first build takes 10 to 20
+minutes, and later builds reuse every layer up to the source code.
+
+PyTorch's wheels on PyPI bring CUDA for graphics cards. The image installs every other
+package from `uv.lock`, with its hash, and PyTorch in the same version from PyTorch's CPU
+index; `--build-arg TORCH=locked` installs `uv.lock` as it is. The app runs as a user
+without root rights and writes only to `data/`.
+
+### Deploying to Azure
+
+`deploy/main.bicep` describes the whole deployment:
+
+```mermaid
+flowchart LR
+    browser([Browser]) -- "HTTPS, password" --> screen
+    subgraph env ["Container Apps environment"]
+        screen["listingaudit-screen"] -- "HTTP, inside only" --> api["listingaudit-api"]
+    end
+    api -- TLS --> pg[("PostgreSQL<br/>Flexible Server")]
+    api -- "managed identity" --> blob[("Blob Storage<br/>photos")]
+    api --> aoai["Azure OpenAI"]
+    vault["Key Vault"] -. secrets .-> env
+    acr["Container Registry"] -. image .-> env
+```
+
+| Resource | What it's for |
+| --- | --- |
+| Container App `listingaudit-screen` | The review screen: the only public address, behind a password |
+| Container App `listingaudit-api` | The review API with the agent and the toolbox, reachable only inside the environment |
+| PostgreSQL Flexible Server (Burstable B1ms) | The marketplace, the rulebook, the paused audits and the audit log, with pgvector |
+| Storage account | The listing photos, in a private container |
+| Key Vault | The database passwords, the screen password and the model's key |
+| Container Registry (Basic) | The image |
+| Managed identity | Pulls the image, reads the secrets and reads the photos |
+| Log Analytics workspace | The apps' logs |
+
+You need an Azure subscription, the
+[Azure CLI](https://learn.microsoft.com/cli/azure/install-azure-cli), Docker running, the
+quick start done (for the data and the models), and the language model in `.env` (see
+"The vision model on Azure OpenAI"). Then:
+
+```bash
+az login
+./deploy/deploy.sh
+./deploy/load_data.sh
+```
+
+`deploy.sh` creates the resource group `listingaudit` in Germany West Central
+(`RESOURCE_GROUP` and `LOCATION` choose others), deploys the infrastructure, builds the
+image and pushes it to the registry, and then deploys the apps. The first run takes 15
+to 30 minutes and ends with the screen's address and the command that shows its
+password. It makes the passwords on the first run and keeps them in Key Vault, so a later
+run only deploys new code. `load_data.sh` copies the marketplace and the rulebook from
+the local database, with `pg_dump` and `psql` from its container, gives the agent its
+read-only login, and uploads the photos. The answer key stays on your computer. With
+Langfuse keys in `.env`, the apps trace too, in the environment `azure`.
+
+Only the screen has a public address, and it asks for its password. The API is reachable
+only from inside the Container Apps environment. The apps read their secrets from Key
+Vault and the photos from Blob Storage with their managed identity, and pull the image
+with it too: the registry has no admin password and the storage account takes no shared
+keys. The database takes only TLS connections, from Azure and from the address you
+deployed from, and the agent logs in with its own read-only role. For a team, Entra ID
+sign-in (Container Apps' built-in authentication) would replace the screen's password,
+and a virtual network with private endpoints would take the database off the internet.
+
+At list prices, the database (about 15 to 20 USD a month) and the registry (about 5 USD a
+month) cost money for as long as they exist; a new Azure account gets the database free
+for its first 12 months. The apps scale to zero when nobody uses them, and light use
+stays within Container Apps' monthly free grant. After a quiet spell, the first visit
+waits a minute or two while the containers start; for a demo, keep one of each awake,
+and set them back to 0 afterwards:
+
+```bash
+az containerapp update --resource-group listingaudit --name listingaudit-api --min-replicas 1
+az containerapp update --resource-group listingaudit --name listingaudit-screen --min-replicas 1
+```
+
+Container Apps ends a request after 240 seconds, so an audit's stream can't run longer.
+To delete everything:
+
+```bash
+./deploy/teardown.sh
+```
+
 ## Project layout
 
 ```
@@ -472,6 +608,7 @@ src/listingaudit/photos/vision.py         asks a vision language model about a p
 src/listingaudit/photos/check.py          the photo check: CLIP first, then the vision model
 src/listingaudit/photos/tune.py           picks CLIP's thresholds on spare photos
 src/listingaudit/photos/evaluate.py       scores CLIP, the vision model and both
+src/listingaudit/photos/store.py          finds a listing's photo, in data/ or in Blob Storage
 src/listingaudit/toolbox/server.py        the MCP server: tools, resources and a prompt
 src/listingaudit/toolbox/audit_prompt.md  the steps of an audit and its report template
 src/listingaudit/agent/graph.py           the agent: a LangGraph graph of the audit steps
@@ -496,7 +633,14 @@ src/listingaudit/eval/judge.py            the AI judge, and a person's grades
 results/exam/                             the exam listings, their answer key, and every audit
 notebooks/                                data exploration
 tests/                                    tests
-.github/workflows/ci.yml                  lint, tests and grading on every push
+.github/workflows/ci.yml                  lint, tests, grading and the Bicep build on every push
+docker-compose.yml                        the database, and the app in Docker
+Dockerfile                                one image for the review API and the review screen
+deploy/main.bicep                         the Azure deployment
+deploy/main.bicepparam                    its settings, from .env and deploy.sh
+deploy/deploy.sh                          deploys the infrastructure, the image and the apps
+deploy/load_data.sh                       copies the data and the photos to Azure
+deploy/teardown.sh                        deletes the deployment
 data/                                     downloaded files (not in git)
 ```
 
