@@ -3,27 +3,43 @@
 1. read_listing gets the listing.
 2. pick_rules: the model judges the kind of product, and the toolbox names the rules.
 3. run_checks: code checks each rule. A listing without a possible problem goes
-   straight to review, as there is nothing to explain.
+   straight to its report, as there is nothing to explain.
 4. look_up_law: the model asks for rulebook searches, which the search step runs, until
    each problem has its passages or the searches run out.
 5. write_report: the model words each finding, and self_check, plain code, tests the
    draft. A failed draft goes back with the feedback; one that still fails goes once to
    the large model (escalate). A draft that never passes is left out, and the report
    keeps to the checks' own words.
-6. human_review: code builds the report for a person to review.
+6. build_report: code builds the report.
+7. With a checkpointer, human_review then pauses the graph until a person approves or
+   rejects each possible problem, and draft_message drafts the message to the seller
+   from the approved ones. Without one, as for batch runs, the graph ends with the report.
 """
 
 from collections import defaultdict
 from typing import Annotated, Any, TypedDict
 
 from langchain_core.messages import AIMessage, AnyMessage, ToolMessage
+from langgraph.checkpoint.base import BaseCheckpointSaver
 from langgraph.graph import END, START, StateGraph
 from langgraph.graph.message import add_messages
 from langgraph.graph.state import CompiledStateGraph
 from langgraph.prebuilt import ToolNode
+from langgraph.types import interrupt
 
 from listingaudit.agent.brain import Brain, law_messages
-from listingaudit.agent.report import CHECKLIST, Note, Problem, Quote, Report, ReportDraft
+from listingaudit.agent.report import (
+    CHECKLIST,
+    Note,
+    Problem,
+    Quote,
+    Report,
+    ReportDraft,
+    Review,
+    counted,
+    review_errors,
+    seller_message,
+)
 from listingaudit.agent.selfcheck import check_draft
 from listingaudit.agent.toolbox import Toolbox
 from listingaudit.checks.results import CheckResult
@@ -46,6 +62,8 @@ class AuditState(TypedDict, total=False):
     attempts: int  # drafts written so far
     large: bool  # whether the large model has taken over
     report: dict[str, Any]
+    review: dict[str, Any]  # a person's Review of the report
+    message: dict[str, Any] | None  # the SellerMessage drafted from it, if any
 
 
 def problems(state: AuditState) -> list[dict[str, Any]]:
@@ -60,10 +78,6 @@ def found_passages(messages: list[AnyMessage]) -> dict[str, dict[str, Any]]:
             for passage in message.artifact["structured_content"]["passages"]:
                 passages.setdefault(passage["chunk_id"], passage)
     return passages
-
-
-def counted(number: int, noun: str) -> str:
-    return f"{number} {noun}" + ("" if number == 1 else "s")
 
 
 def assemble(state: AuditState) -> Report:
@@ -124,12 +138,46 @@ def assemble(state: AuditState) -> Report:
     )
 
 
+def step_line(step: str, update: dict[str, Any]) -> str:
+    """One line on what a step of the graph did."""
+    match step:
+        case "read_listing":
+            return update["listing"]["title"][:70]
+        case "pick_rules":
+            rules = ", ".join(rule["rule"] for rule in update["rules"])
+            return f"{update['kind']} ({update['kind_reason']}) -> {rules}"
+        case "run_checks":
+            statuses = [result["status"] for result in update["results"]]
+            found = counted(statuses.count("problem"), "possible problem")
+            return f"{counted(len(statuses), 'check')}, {found}"
+        case "look_up_law":
+            calls = update["messages"][-1].tool_calls
+            return "; ".join(call["args"].get("query", "") for call in calls) or "done searching"
+        case "search":
+            return f"{len(found_passages(update['messages']))} passages"
+        case "self_check":
+            return counted(len(update["feedback"]), "issue") if update["feedback"] else "passed"
+        case "write_report":
+            return f"draft {update['attempts']}"
+        case "escalate":
+            return "the large model takes over"
+        case "human_review":
+            review = update["review"]
+            approved = sum(decision["approved"] for decision in review["decisions"])
+            return f"{review['reviewer']} approved {approved} of {len(review['decisions'])}"
+        case "draft_message":
+            return "message to the seller drafted" if update["message"] else "nothing to send"
+    return "report ready"
+
+
 def build_graph(
     toolbox: Toolbox,
     brain: Brain,
     max_searches: int = MAX_SEARCHES,
     max_attempts: int = MAX_ATTEMPTS,
+    checkpointer: BaseCheckpointSaver | None = None,
 ) -> CompiledStateGraph:
+    """The audit graph. With a checkpointer, it pauses for a person's review."""
     lawyer = brain.lawyer(toolbox.search)
 
     async def read_listing(state: AuditState) -> AuditState:
@@ -157,7 +205,7 @@ def build_graph(
         return {"results": results}
 
     def after_checks(state: AuditState) -> str:
-        return "look_up_law" if problems(state) else "human_review"
+        return "look_up_law" if problems(state) else "build_report"
 
     async def look_up_law(state: AuditState) -> AuditState:
         # The first turn starts the conversation; the next ones read the search results
@@ -187,34 +235,60 @@ def build_graph(
 
     def after_self_check(state: AuditState) -> str:
         if not state["feedback"] or state.get("large"):
-            return "human_review"
+            return "build_report"
         if state["attempts"] < max_attempts:
             return "write_report"
-        return "escalate" if brain.large else "human_review"
+        return "escalate" if brain.large else "build_report"
 
     def escalate(state: AuditState) -> AuditState:
         return {"large": True}
 
-    def human_review(state: AuditState) -> AuditState:
+    def build_report(state: AuditState) -> AuditState:
         return {"report": assemble(state).model_dump(mode="json")}
+
+    def human_review(state: AuditState) -> AuditState:
+        # On each resume the node runs again from the top, and each interrupt() in turn
+        # returns the answer it got. An answer that doesn't fit Review is refused before
+        # anything is saved; one that leaves a finding open is asked again, with reasons.
+        report = Report.model_validate(state["report"])
+        question = {"decide_on": [problem.rule.value for problem in report.problems]}
+        errors: list[str] = []
+        while True:
+            review = interrupt(question | {"errors": errors}, response_schema=Review)
+            errors = review_errors(report, review)
+            if not errors:
+                return {"review": review.model_dump(mode="json")}
+
+    def draft_message(state: AuditState) -> AuditState:
+        report = Report.model_validate(state["report"])
+        review = Review.model_validate(state["review"])
+        message = seller_message(report, review, state["listing"]["seller_id"])
+        return {"message": message.model_dump(mode="json") if message else None}
 
     graph = StateGraph(AuditState)
     for step in (read_listing, pick_rules, run_checks, look_up_law, write_report, self_check):
         graph.add_node(step)
     graph.add_node("search", ToolNode([toolbox.search]))
     graph.add_node(escalate)
-    graph.add_node(human_review)
+    graph.add_node(build_report)
 
     graph.add_edge(START, "read_listing")
     graph.add_edge("read_listing", "pick_rules")
     graph.add_edge("pick_rules", "run_checks")
-    graph.add_conditional_edges("run_checks", after_checks, ["look_up_law", "human_review"])
+    graph.add_conditional_edges("run_checks", after_checks, ["look_up_law", "build_report"])
     graph.add_conditional_edges("look_up_law", after_law, ["search", "write_report"])
     graph.add_edge("search", "look_up_law")
     graph.add_edge("write_report", "self_check")
     graph.add_conditional_edges(
-        "self_check", after_self_check, ["write_report", "escalate", "human_review"]
+        "self_check", after_self_check, ["write_report", "escalate", "build_report"]
     )
     graph.add_edge("escalate", "write_report")
-    graph.add_edge("human_review", END)
-    return graph.compile()
+    if checkpointer is None:
+        graph.add_edge("build_report", END)
+    else:
+        graph.add_node(human_review)
+        graph.add_node(draft_message)
+        graph.add_edge("build_report", "human_review")
+        graph.add_edge("human_review", "draft_message")
+        graph.add_edge("draft_message", END)
+    return graph.compile(checkpointer=checkpointer)

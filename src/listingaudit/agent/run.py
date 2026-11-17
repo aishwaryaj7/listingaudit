@@ -17,7 +17,7 @@ from typing import Any
 from langchain_core.callbacks import UsageMetadataCallbackHandler
 
 from listingaudit.agent.brain import Brain
-from listingaudit.agent.graph import build_graph, counted, found_passages
+from listingaudit.agent.graph import build_graph, step_line
 from listingaudit.agent.report import Report, render
 from listingaudit.agent.toolbox import ToolError, open_toolbox
 from listingaudit.config import settings
@@ -35,32 +35,6 @@ def cost(usage: dict[str, Any]) -> float | None:
             return None
         total += (tokens["input_tokens"] * price[0] + tokens["output_tokens"] * price[1]) / 1e6
     return total
-
-
-def step_line(step: str, update: dict[str, Any]) -> str:
-    """One line on what a step of the graph did."""
-    match step:
-        case "read_listing":
-            return update["listing"]["title"][:70]
-        case "pick_rules":
-            rules = ", ".join(rule["rule"] for rule in update["rules"])
-            return f"{update['kind']} ({update['kind_reason']}) -> {rules}"
-        case "run_checks":
-            statuses = [result["status"] for result in update["results"]]
-            found = counted(statuses.count("problem"), "possible problem")
-            return f"{counted(len(statuses), 'check')}, {found}"
-        case "look_up_law":
-            calls = update["messages"][-1].tool_calls
-            return "; ".join(call["args"].get("query", "") for call in calls) or "done searching"
-        case "search":
-            return f"{len(found_passages(update['messages']))} passages"
-        case "self_check":
-            return counted(len(update["feedback"]), "issue") if update["feedback"] else "passed"
-        case "write_report":
-            return f"draft {update['attempts']}"
-        case "escalate":
-            return "the large model takes over"
-    return "report ready for review"
 
 
 async def audit(graph: Any, offer_id: str, save: bool) -> None:
