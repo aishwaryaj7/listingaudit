@@ -5,6 +5,7 @@ other client. Code calls the tools it runs itself, and the rulebook search also 
 the language model as a LangChain tool, so the model can ask for searches.
 """
 
+import base64
 import os
 import sys
 from collections.abc import AsyncIterator
@@ -16,6 +17,7 @@ from langchain_core.tools import BaseTool
 from langchain_mcp_adapters.client import MultiServerMCPClient
 from langchain_mcp_adapters.tools import load_mcp_tools
 from mcp import ClientSession
+from pydantic import AnyUrl
 
 SERVER = {
     "transport": "stdio",
@@ -47,6 +49,11 @@ class Toolbox:
         if result.isError:
             raise ToolError(f"{name}: {result.content[0].text}")
         return result.structuredContent
+
+    async def photo(self, offer_id: str) -> bytes:
+        """The listing's main photo, read from the server's photo resource."""
+        result = await self.session.read_resource(AnyUrl(f"listing://{offer_id}/photo"))
+        return base64.b64decode(result.contents[0].blob)
 
     @property
     def search(self) -> BaseTool:

@@ -2,7 +2,7 @@
 
 from pathlib import Path
 
-from pydantic import SecretStr
+from pydantic import Field, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
@@ -41,6 +41,11 @@ class Settings(BaseSettings):
     # without one, the small model does everything.
     agent_model: str = "gpt-5-mini"
     agent_model_large: str | None = None
+
+    # The schema that holds the audit log and the checkpoints of audits waiting for review
+    review_schema: str = Field(default="review", pattern=r"^[a-z_][a-z0-9_]*$")
+    # The review API, where the review screen finds it
+    api_url: str = "http://127.0.0.1:8000"
 
     @property
     def database_url(self) -> str:
