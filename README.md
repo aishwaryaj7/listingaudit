@@ -15,7 +15,28 @@ approves every finding.
 ## Results
 
 <!-- results:start -->
-The results table appears here once the evaluation has run (see "The evaluation" below).
+
+Results on the 400 exam listings (python -m listingaudit.eval.grade):
+
+| Question | agent | rules only | one prompt | Target | Agent meets it |
+|---|---|---|---|---|---|
+| Catches price problems | 100% (90/90) | 100% (90/90) | 100% (75/75) | 90% | yes |
+| Catches missing information and label problems | 92% (112/122) | 92% (112/122) | 96% (101/105) | 90% | yes |
+| Catches photo swaps | 77% (23/30) | 0% (0/30) | 100% (28/28) | 70% | yes |
+| Clean listings with a false alarm | 4% (4/104) | 0% (0/105) | 57% (54/94) | under 5% | yes |
+| Tricky but legal listings with a false alarm | 9% (7/75) | 9% (7/75) | 68% (45/66) |  |  |
+| Possible problems that are real (precision) | 93% (225/242) | 97% (202/209) | 50% (204/408) |  |  |
+| Listings checked against exactly the right rules | 95% (381/399) | 96% (385/400) | n/a | 90% | yes |
+| Findings quoting the rule's own law and article | 36% (88/242) | n/a | 66% (271/408) | 95% | no |
+| Reports with only real numbers | 100% (399/399) | 100% (400/400) | 68% (237/349) | 100% | yes |
+| Fixes that pass the check once applied | 67% (135/202) | n/a | 82% (144/176) | 95% | no |
+| Clarity / fairness, judged by a model (1 to 5) | 4.34 / 4.75 | n/a | 1.86 / 2.22 |  |  |
+| Judge within one point of a person's grade | n/a | n/a | n/a | most |  |
+| Sneaky-note listings with every problem still found | 100% (20/20) | 100% (20/20) | 94% (15/16) | 100% | yes |
+| Listings with the same findings in every run | 90% (9/10) | n/a | n/a | most | yes |
+| Cost per 1,000 listings (USD, list price) | $3.15 | $0.00 | $2.34 |  |  |
+| Minutes per 1,000 listings, one at a time | 165 | 0 | 196 |  |  |
+
 <!-- results:end -->
 
 ## How it works
