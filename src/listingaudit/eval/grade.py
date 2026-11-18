@@ -424,7 +424,9 @@ def main() -> None:
     )
     args = parser.parse_args()
     if not (folder(args.split) / "answer_key.json").exists():
-        parser.error(f"results/{args.split} holds no runs yet: see 'The evaluation' in README.md.")
+        parser.error(
+            f"results/{args.split} holds no runs yet: see 'The evaluation' in docs/guide.md."
+        )
 
     scores, listings = load(args.split)
     print(headline(scores), end="\n\n")
