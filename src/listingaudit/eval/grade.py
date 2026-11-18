@@ -1,17 +1,14 @@
 """Grade the systems' audits against the answer key, and check the gates.
 
     uv run python -m listingaudit.eval.grade
-    uv run python -m listingaudit.eval.grade --readme
     uv run python -m listingaudit.eval.grade --check
 
 Reads what the evaluation saved under results/<split>/ and needs neither the database
-nor a language model, so CI runs it on every push. --readme writes the results table
-into README.md; --check fails when a gate fails or README.md's table is out of date.
+nor a language model, so CI runs it on every push. --check fails when a gate fails.
 """
 
 import argparse
 import csv
-import re
 import sys
 from collections import defaultdict
 from dataclasses import dataclass, field
@@ -20,7 +17,6 @@ from decimal import Decimal
 from listingaudit.agent.report import CHECKLIST, Report
 from listingaudit.agent.selfcheck import NUMBER, VERDICT, amounts, known_numbers
 from listingaudit.checks.results import CheckResult
-from listingaudit.config import PROJECT_ROOT
 from listingaudit.eval.baselines import SHOWN_FIELDS
 from listingaudit.eval.records import (
     SYSTEMS,
@@ -51,8 +47,6 @@ GROUPS = {
 # The photo model's cost per photo, at gpt-5-mini's list price, from the average tokens
 # per photo in the photo check's evaluation (423 in, 208 out)
 PHOTO_MODEL_COST = (423 * 0.25 + 208 * 2.00) / 1e6
-README = PROJECT_ROOT / "README.md"
-START, END = "<!-- results:start -->", "<!-- results:end -->"
 
 Ratio = tuple[int, int]  # how many of how many
 
@@ -374,30 +368,6 @@ def gates(scores: dict[str, Scores], listings: int) -> list[str]:
     return failed
 
 
-def readme_section(scores: dict[str, Scores], split: str, listings: int) -> str:
-    return (
-        f"{START}\n\nResults on the {listings} {split} listings "
-        "(python -m listingaudit.eval.grade):\n\n"
-        f"{headline(scores)}\n\n{END}"
-    )
-
-
-def update_readme(section: str) -> bool:
-    """Write the section between the README's markers; True when it changed."""
-    text = README.read_text(encoding="utf-8")
-    pattern = re.compile(re.escape(START) + ".*?" + re.escape(END), re.DOTALL)
-    if not pattern.search(text):
-        raise ValueError(f"README.md has no {START} ... {END} section")
-    new = pattern.sub(lambda _: section, text)
-    if new != text:
-        README.write_text(new, encoding="utf-8")
-    return new != text
-
-
-def readme_is_current(section: str) -> bool:
-    return section in README.read_text(encoding="utf-8")
-
-
 def load(split: str) -> tuple[dict[str, Scores], int]:
     key = read_answer_key(split)
     listings = read_listings(split)
@@ -418,27 +388,19 @@ def load(split: str) -> tuple[dict[str, Scores], int]:
 def main() -> None:
     parser = argparse.ArgumentParser(description="Grade the audits against the answer key.")
     parser.add_argument("--split", default="exam", choices=["exam", "practice"])
-    parser.add_argument("--readme", action="store_true", help="write the table into README.md")
-    parser.add_argument(
-        "--check", action="store_true", help="fail on a gate or an out-of-date README table"
-    )
+    parser.add_argument("--check", action="store_true", help="fail when a gate fails")
     args = parser.parse_args()
     if not (folder(args.split) / "answer_key.json").exists():
         parser.error(
-            f"results/{args.split} holds no runs yet: see 'The evaluation' in docs/guide.md."
+            f"results/{args.split} holds no runs yet: run python -m listingaudit.eval.run first."
         )
 
     scores, listings = load(args.split)
     print(headline(scores), end="\n\n")
     print(details(scores))
 
-    section = readme_section(scores, args.split, listings)
-    if args.readme and update_readme(section):
-        print("\nREADME.md's results table is updated.", file=sys.stderr)
     if args.check:
         failed = gates(scores, listings)
-        if not readme_is_current(section):
-            failed.append("README.md's results table is out of date: run with --readme.")
         for line in failed:
             print(f"Gate failed: {line}", file=sys.stderr)
         if failed:

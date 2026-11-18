@@ -279,29 +279,6 @@ def test_the_table_shows_each_system_and_whether_the_agent_meets_the_target(scor
     assert "| 3.0 / 4.0 | n/a |" in judged
 
 
-def test_the_readme_table_is_written_between_its_markers(scores, tmp_path, monkeypatch):
-    readme = tmp_path / "README.md"
-    readme.write_text(f"# Title\n\n{grader.START}\nold\n{grader.END}\n\nMore.\n")
-    monkeypatch.setattr(grader, "README", readme)
-    section = grader.readme_section({"agent": scores}, "exam", 5)
-
-    assert not grader.readme_is_current(section)
-    assert grader.update_readme(section)
-    assert grader.readme_is_current(section)
-    assert not grader.update_readme(section)
-    text = readme.read_text()
-    assert text.startswith("# Title\n\n<!-- results:start -->\n\nResults on the 5 exam listings")
-    assert text.endswith(f"{grader.END}\n\nMore.\n")
-
-
-def test_a_readme_without_markers_is_an_error(scores, tmp_path, monkeypatch):
-    readme = tmp_path / "README.md"
-    readme.write_text("# Title\n")
-    monkeypatch.setattr(grader, "README", readme)
-    with pytest.raises(ValueError, match="no <!-- results:start -->"):
-        grader.update_readme(grader.readme_section({"agent": scores}, "exam", 5))
-
-
 @pytest.mark.parametrize(
     ("article", "key"),
     [
